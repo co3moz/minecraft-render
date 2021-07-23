@@ -41,7 +41,7 @@ export class RenderTest {
           continue;
         }
 
-        const filePath = path.resolve(__dirname, `../../test-data/render/${render.blockName}.png`);
+        const filePath = path.resolve(__dirname, `../../test-data/${render.blockName}.png`);
 
         await writeAsync(filePath, render.buffer);
       }

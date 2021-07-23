@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc .",
-    "test": "nole ./src/**/*.test.ts"
+    "test": "nole -L ./src/**/*.test.ts"
   },
   "keywords": [],
   "author": "",
