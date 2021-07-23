@@ -31,7 +31,7 @@ export async function prepareRenderer(): Promise<Renderer> {
   const camera = new THREE.OrthographicCamera(- distance * aspect, distance * aspect, distance, - distance, 0.01, 20000);
 
   const light = new THREE.DirectionalLight(0xFFFFFF, 1.2);
-  light.position.set(-15, 30, -30); // cube directions x => negative:bottom right, y => positive:top, z => negative:bottom left
+  light.position.set(-15, 30, -25); // cube directions x => negative:bottom right, y => positive:top, z => negative:bottom left
   scene.add(light);
 
   if (DEBUG_PLANE) {
