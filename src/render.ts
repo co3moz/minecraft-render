@@ -152,7 +152,8 @@ async function constructTextureMaterial(minecraft: Minecraft, path: string, face
 
   const texture = new THREE.Texture(canvas as any);
   texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.LinearMipMapLinearFilter;
+  // texture.minFilter = THREE.LinearMipMapLinearFilter;
+  texture.minFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
 
   return new THREE.MeshStandardMaterial({
