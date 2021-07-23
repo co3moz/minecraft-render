@@ -15,16 +15,11 @@ jobs:
     - run: npm install
     - run: sudo apt-get install xvfb
     - run: xvfb-run --auto-servernum npm test
-    - name: Remove File
-      uses: JesseTG/rm@v1.0.2
-      with:
-        path: test-data/test.jar
-    - uses: papeloto/action-zip@v1
-      with:
-        files: test-data/
-        dest: test-result.zip
     - name: Archive production artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: dist-without-markdown
-        path: test-result.zip
+        name: test-result
+        path: |
+          test-data/*
+          !test-data/test.jar
+          !test-data/.gitignore
