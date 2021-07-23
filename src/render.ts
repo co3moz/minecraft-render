@@ -31,7 +31,7 @@ export async function prepareRenderer(): Promise<Renderer> {
   const camera = new THREE.OrthographicCamera(- distance * aspect, distance * aspect, distance, - distance, 0.01, 20000);
 
   const light = new THREE.DirectionalLight(0xFFFFFF, 1.2);
-  light.position.set(15, 20, -10);
+  light.position.set(-15, 30, -30); // cube directions x => negative:bottom right, y => positive:top, z => negative:bottom left
   scene.add(light);
 
   if (DEBUG_PLANE) {
@@ -112,7 +112,7 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 
   // const rotation = new THREE.Vector3(...gui.rotation).sub(new THREE.Vector3(15, 188.130102, -45));
   // const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(15, 188.130102, -45));
-  const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(15, 165, -45));
+  const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(195, 165, -45));
   camera.position.set(...rotation.toArray().map(x => Math.sin(x * THREE.MathUtils.DEG2RAD) * 16) as [number, number, number]);
   camera.lookAt(0, 0, 0)
   camera.position.add(new THREE.Vector3(...gui.translation));

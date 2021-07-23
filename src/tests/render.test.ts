@@ -17,7 +17,7 @@ export class RenderTest {
         return this.minecraftTest.minecraft.getModel(blockName)
       }));
 
-    const testBlocks = blocks;
+    // const testBlocks = blocks;
     // const testBlocks = blocks.slice(0, 300);
     // let testBlocks = blocks.filter(x => x.blockName! === 'cactus');
     // testBlocks = [...testBlocks[0].elements!.map((element, i) => {
@@ -29,7 +29,7 @@ export class RenderTest {
     // ];   
 
 
-    // let testBlocks = blocks.filter(x => x.blockName! === 'lectern' || x.blockName == 'diamond_ore');
+    let testBlocks = blocks.filter(x => x.blockName! === 'lectern' || x.blockName == 'diamond_ore'  || x.blockName == 'acacia_log');
     // let testBlocks = blocks.filter(x => x.blockName! === 'acacia_log');
 
     await this.minecraftTest.minecraft.prepareRenderEnvironment();
