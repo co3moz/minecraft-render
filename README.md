@@ -24,9 +24,13 @@ Basic usage;
 npx minecraft-render minecraft-version.1.17.1.jar 
 ```
 
-You see that ./minecraft-version.1.17.1 folder appeared with 
-
-
+```sh
+...
+[0168 / 1710] observer rendered to minecraft-version.1.17.1.jar\observer.png
+[0169 / 1710] comparator_on_subtract skipped due to "no gui"
+[0170 / 1710] template_trapdoor_open skipped due to "no gui"
+...
+```
 
 ### Using Rendering API
 

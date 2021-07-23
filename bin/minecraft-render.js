@@ -38,7 +38,7 @@ async function Main(jarPath) {
       continue;
     }
 
-    const filePath = `${folder}/${block.blockName}.png`
+    const filePath = path.resolve(`${folder}/${block.blockName}.png`);
     await writeFileAsync(filePath, block.buffer);
 
     console.log(`[${j} / ${totalBlocks}] ${block.blockName} rendered to ${filePath}`)
