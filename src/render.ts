@@ -9,6 +9,7 @@ import { distance, invert, mul, size } from './utils/vector-math';
 
 const DEBUG_PLANE = 0;
 
+
 export async function prepareRenderer(): Promise<Renderer> {
   const width = 1000;
   const height = 1000;
@@ -55,6 +56,7 @@ export async function destroyRenderer(renderer: Renderer) {
   (renderer.canvas as any).__gl__.getExtension('STACKGL_destroy_context').destroy();
 }
 
+
 export async function render(minecraft: Minecraft, block: BlockModel): Promise<BlockModel & { buffer: Buffer, skip?: string }> {
   const { canvas, renderer, scene, camera } = minecraft._renderer!;
   const resultBlock: BlockModel & { buffer: Buffer, skip?: string } = block as any;
@@ -67,7 +69,6 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
   }
 
   const clean = [];
-  console.log('rendering: ' + block.blockName + ' ' + JSON.stringify(gui) + ' textures ' + JSON.stringify(block.textures));
 
   camera.zoom = 1.0 / distance(gui.scale);
 
@@ -76,7 +77,6 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 
   for (const element of block.elements!) {
     element.calculatedSize = size(element.from!, element.to!);
-    console.log('element size: ', element.calculatedSize, JSON.stringify(element));
 
     const geometry = new THREE.BoxGeometry(...element.calculatedSize, 1, 1, 1);
     const cube = new THREE.Mesh(geometry, await constructBlockMaterial(minecraft, block, element));
@@ -90,7 +90,6 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 
     if (element.rotation) {
       const origin = mul(element.rotation.origin!, -0.0625);
-      // const origin = invert(element.rotation.origin!)
       cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...invert(origin)))
 
       if (element.rotation.axis == 'y') {
@@ -100,7 +99,6 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
       }
       
       cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin))
-
       cube.updateMatrix();
     }
 
@@ -110,8 +108,6 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
     clean.push(cube);
   }
 
-  // const rotation = new THREE.Vector3(...gui.rotation).sub(new THREE.Vector3(15, 188.130102, -45));
-  // const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(15, 188.130102, -45));
   const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(195, -90, -45));
   camera.position.set(...rotation.toArray().map(x => Math.sin(x * THREE.MathUtils.DEG2RAD) * 16) as [number, number, number]);
   camera.lookAt(0, 0, 0)
@@ -130,6 +126,7 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
   resultBlock.buffer = buffer;
   return resultBlock;
 }
+
 
 async function constructTextureMaterial(minecraft: Minecraft, path: string, face: Face, element: Element) {
   const cache = minecraft._renderer!.textureCache;
@@ -152,7 +149,6 @@ async function constructTextureMaterial(minecraft: Minecraft, path: string, face
 
   const texture = new THREE.Texture(canvas as any);
   texture.magFilter = THREE.NearestFilter;
-  // texture.minFilter = THREE.LinearMipMapLinearFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
 
@@ -167,6 +163,7 @@ async function constructTextureMaterial(minecraft: Minecraft, path: string, face
   });
 }
 
+
 async function constructBlockMaterial(minecraft: Minecraft, block: BlockModel, element: Element): Promise<THREE.Material[]> {
   if (!element?.faces) { return [] };
 
@@ -175,12 +172,14 @@ async function constructBlockMaterial(minecraft: Minecraft, block: BlockModel, e
   return <any>await Promise.all([east, west, up, down, south, north].map(face => decodeFace(face, block, element, minecraft)));
 }
 
+
 async function decodeFace(face: Face | null | undefined, block: BlockModel, element: Element, minecraft: Minecraft): Promise<THREE.Material | null> {
   if (!face) return null;
   const decodedTexture = decodeTexture(face.texture, block);
   if (!decodedTexture) return null;
   return await constructTextureMaterial(minecraft, decodedTexture!, face!, element)
 }
+
 
 function decodeTexture(texture: string, block: BlockModel): string | null {
   texture = texture ?? '';

@@ -19,9 +19,14 @@ export class Minecraft {
     return new Minecraft(file);
   }
 
-  async getBlockList() {
+  async getBlockNameList(): Promise<string[]> {
     return (await this.jar.entries('assets/minecraft/models/block'))
       .filter(entry => entry.name.endsWith(".json"))
+      .map(entry => entry.name.slice('assets/minecraft/models/block/'.length, -('.json'.length)))
+  }
+
+  async getBlockList(): Promise<BlockModel[]> {
+    return await Promise.all((await this.getBlockNameList()).map(block => this.getModel(block)));
   }
 
   _cache: { [key: string]: any } = {}
@@ -66,8 +71,14 @@ export class Minecraft {
   }
 
   async *render(blocks: BlockModel[]) {
-    for (const block of blocks) {
-      yield await render(this, block);
+    try {
+      await this.prepareRenderEnvironment();
+
+      for (const block of blocks) {
+        yield await render(this, block);
+      }
+    } finally {
+      await this.cleanupRenderEnvironment();
     }
   }
 
