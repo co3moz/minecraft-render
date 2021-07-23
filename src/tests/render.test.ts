@@ -29,7 +29,12 @@ export class RenderTest {
     // ];   
 
 
-    // let testBlocks = blocks.filter(x => x.blockName! === 'lectern' || x.blockName == 'diamond_ore'  || x.blockName == 'acacia_log');
+    // let testBlocks = blocks.filter(x =>
+    //   x.blockName! === 'lectern' ||
+    //   x.blockName == 'diamond_ore' ||
+    //   x.blockName == 'stone_stairs' ||
+    //   x.blockName == 'acacia_log'
+    // );
     // let testBlocks = blocks.filter(x => x.blockName! === 'acacia_log');
 
     await this.minecraftTest.minecraft.prepareRenderEnvironment();
