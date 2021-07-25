@@ -1,6 +1,6 @@
 import { destroyRenderer, prepareRenderer, render, RendererOptions } from "./render";
 import { Jar } from "./utils/jar";
-import type { BlockModel, Renderer } from "./utils/types";
+import type { AnimationMeta, BlockModel, Renderer } from "./utils/types";
 //@ts-ignore
 import * as deepAssign from 'assign-deep';
 
@@ -69,8 +69,23 @@ export class Minecraft {
       throw new Error(`Unable to find texture file: ${path}`)
     }
   }
+  async getTextureMetadata(name: string = ''): Promise<AnimationMeta|false> {
+    name = name ?? '';
+    if (name.startsWith('minecraft:')) {
+      name = name.substring('minecraft:'.length);
+    }
+
+    const path = `assets/minecraft/textures/${name}.png.mcmeta`;
+
+    try {
+      return await this.jar.readJson(path);
+    } catch (e) {
+      return false; 
+    }
+  }
 
   async *render(blocks: BlockModel[], options?: RendererOptions) {
+
     try {
       await this.prepareRenderEnvironment(options);
 
