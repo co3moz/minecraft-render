@@ -1,4 +1,4 @@
-import { destroyRenderer, prepareRenderer, render } from "./render";
+import { destroyRenderer, prepareRenderer, render, RendererOptions } from "./render";
 import { Jar } from "./utils/jar";
 import type { BlockModel, Renderer } from "./utils/types";
 //@ts-ignore
@@ -70,9 +70,9 @@ export class Minecraft {
     }
   }
 
-  async *render(blocks: BlockModel[]) {
+  async *render(blocks: BlockModel[], options?: RendererOptions) {
     try {
-      await this.prepareRenderEnvironment();
+      await this.prepareRenderEnvironment(options);
 
       for (const block of blocks) {
         yield await render(this, block);
@@ -104,8 +104,8 @@ export class Minecraft {
 
   _renderer!: Renderer | null;
 
-  async prepareRenderEnvironment() {
-    this._renderer = await prepareRenderer()
+  async prepareRenderEnvironment(options: RendererOptions = { }) {
+    this._renderer = await prepareRenderer(options)
   }
 
   async cleanupRenderEnvironment() {

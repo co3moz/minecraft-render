@@ -9,11 +9,12 @@ import { distance, invert, mul, size } from './utils/vector-math';
 
 const DEBUG_PLANE = 0;
 
+export interface RendererOptions {
+  width?: number;
+  height?: number;
+}
 
-export async function prepareRenderer(): Promise<Renderer> {
-  const width = 1000;
-  const height = 1000;
-
+export async function prepareRenderer({ width = 1000, height = 1000 }: RendererOptions): Promise<Renderer> {
   const scene = new THREE.Scene();
 
   const canvas: rawCanvas.Canvas = createCanvas(width, height);
