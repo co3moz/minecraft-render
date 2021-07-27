@@ -8,29 +8,36 @@ const { Minecraft } = require('../dist');
 const { cwd } = require('process');
 
 program
-  .usage('<jar>')
+  .usage('<jar> [output]')
+  .option('-w, --width [width]', 'width', 1000)
+  .option('-t, --height [height]', 'height', 1000)
   .version(package.version)
   .parse(process.argv);
+
+const options = program.opts();
 
 if (!program.args.length) {
   return program.help();
 }
 
-async function Main(jarPath) {
-  const minecraft = Minecraft.open(jarPath);
+async function Main() {
+  const minecraft = Minecraft.open(path.resolve(cwd(), program.args[0]));
   const blocks = await minecraft.getBlockList();
   let i = 0;
 
-  const folder = path.resolve(cwd(), path.basename(jarPath));
+  const folder = path.resolve(cwd(), path.basename(path.resolve(cwd(), program.args[1] || 'output')));
 
-  if (!(await fileStat(folder))) {
-    await makeFolder(folder);
+  if (!fs.existsSync(folder)) {
+    await fs.promises.mkdir(folder);
   }
 
   const padSize = Math.ceil(Math.log10(blocks.length));
   const totalBlocks = blocks.length.toString().padStart(padSize, '0');
 
-  for await (const block of minecraft.render(blocks)) {
+  for await (const block of minecraft.render(blocks, {
+    height: parseInt(options.height) || 1000,
+    width: parseInt(options.width) || 1000
+  })) {
     const j = (++i).toString().padStart(padSize, '0');
 
     if (!block.buffer) {
@@ -39,39 +46,12 @@ async function Main(jarPath) {
     }
 
     const filePath = path.resolve(`${folder}/${block.blockName}.png`);
-    await writeFileAsync(filePath, block.buffer);
+    await fs.promises.writeFile(filePath, block.buffer);
 
-    console.log(`[${j} / ${totalBlocks}] ${block.blockName} rendered to ${filePath}`)
+    console.log(`[${j} / ${totalBlocks}] ${block.blockName} rendered to ${filePath}`);
   }
 
   console.log(`Rendering completed! "${folder}"`);
 }
 
-function writeFileAsync(path, buffer) {
-  return new Promise((resolve, reject) => {
-    fs.writeFile(path, buffer, err => {
-      if (err) reject(err);
-      else resolve();
-    })
-  })
-}
-
-function fileStat(path) {
-  return new Promise((resolve, reject) => {
-    fs.stat(path, (err, stats) => {
-      if (err) resolve(null);
-      else resolve(stats);
-    })
-  })
-}
-
-function makeFolder(path) {
-  return new Promise((resolve, reject) => {
-    fs.mkdir(path, err => {
-      if (err) reject(err);
-      else resolve();
-    })
-  })
-}
-
-Main(path.resolve(cwd(), program.args[0])).catch(e => console.error('Rendering failed! ' + ((e && e.stack) || e)));
+Main().catch(e => console.error('Rendering failed!', e));
