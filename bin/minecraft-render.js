@@ -11,6 +11,7 @@ program
   .usage('<jar> [output]')
   .option('-w, --width [width]', 'width', 1000)
   .option('-t, --height [height]', 'height', 1000)
+  .option('-d, --distance [distance]', 'distance', 20)
   .version(package.version)
   .parse(process.argv);
 
@@ -35,9 +36,12 @@ async function Main() {
   const totalBlocks = blocks.length.toString().padStart(padSize, '0');
 
   const rendererOptions = {
-    height: parseInt(options.height) || 1000,
-    width: parseInt(options.width) || 1000
+    height: parseInt(options.height),
+    width: parseInt(options.width),
+    distance: parseInt(options.distance)
   };
+
+  console.log(rendererOptions);
 
   for await (const block of minecraft.render(blocks, rendererOptions)) {
     const j = (++i).toString().padStart(padSize, '0');

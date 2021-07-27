@@ -12,12 +12,15 @@ const DEBUG_PLANE = 0;
 export interface RendererOptions {
   width?: number;
   height?: number;
+  distance?: number
 }
 
-export async function prepareRenderer({ width = 1000, height = 1000 }: RendererOptions): Promise<Renderer> {
+export async function prepareRenderer({ width = 1000, height = 1000, distance = 20 }: RendererOptions): Promise<Renderer> {
   const scene = new THREE.Scene();
 
   const canvas: rawCanvas.Canvas = createCanvas(width, height);
+
+  console.log(width, height, distance);
 
   const renderer = new THREE.WebGLRenderer({
     canvas: (canvas as any),
@@ -29,7 +32,6 @@ export async function prepareRenderer({ width = 1000, height = 1000 }: RendererO
   renderer.sortObjects = false;
 
   const aspect = width / height;
-  const distance = 20;
   const camera = new THREE.OrthographicCamera(- distance * aspect, distance * aspect, distance, - distance, 0.01, 20000);
 
   const light = new THREE.DirectionalLight(0xFFFFFF, 1.2);
