@@ -6,10 +6,11 @@ import { distance, invert, mul, size } from './utils/vector-math';
 import { Logger } from './utils/logger';
 //@ts-ignore
 import { createCanvas, loadImage } from 'node-canvas-webgl';
+import { makeAnimatedPNG } from './utils/apng';
 
 const MATERIAL_FACE_ORDER = ['east', 'west', 'up', 'down', 'south', 'north'] as const;
 
-export async function prepareRenderer({ width = 1000, height = 1000, distance = 20, plane = 0 }: RendererOptions): Promise<Renderer> {
+export async function prepareRenderer({ width = 1000, height = 1000, distance = 20, plane = 0, animation = true }: RendererOptions): Promise<Renderer> {
   const scene = new THREE.Scene();
 
   const canvas: rawCanvas.Canvas = createCanvas(width, height);
@@ -50,7 +51,15 @@ export async function prepareRenderer({ width = 1000, height = 1000, distance = 
     Logger.debug(() => `Plane added to scene`);
   }
 
-  return { scene, renderer, canvas, camera, textureCache: {}, animatedCache: {} };
+  return {
+    scene,
+    renderer,
+    canvas,
+    camera,
+    textureCache: {},
+    animatedCache: {},
+    options: { width, height, distance, plane, animation }
+  };
 }
 
 export async function destroyRenderer(renderer: Renderer) {
@@ -65,7 +74,7 @@ export async function destroyRenderer(renderer: Renderer) {
 
 
 export async function render(minecraft: Minecraft, block: BlockModel): Promise<BlockModel & { buffer: Buffer, skip?: string }> {
-  const { canvas, renderer, scene, camera } = minecraft.getRenderer()!;
+  const { canvas, renderer, scene, camera, options } = minecraft.getRenderer()!;
   const resultBlock: BlockModel & { buffer: Buffer, skip?: string } = block as any;
 
   const gui = block.display?.gui;
@@ -77,102 +86,118 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 
   Logger.trace(() => `Started rendering ${resultBlock.blockName}`);
 
-  const clean = [];
-
   camera.zoom = 1.0 / distance(gui.scale);
 
   Logger.trace(() => `Camera zoom = ${camera.zoom}`);
 
-  block.elements!.reverse();
-  let i = 0;
+  if (typeof block.animationCurrentTick == 'undefined') {
+    block.animationCurrentTick = 0;
+  }
 
-  Logger.trace(() => `Element count = ${block.elements!.length}`);
+  // block.elements!.reverse();
 
-  for (const element of block.elements!) {
-    Logger.trace(() => `Element[${i}] started rendering`);
-    element.calculatedSize = size(element.from!, element.to!);
+  const buffers = [];
 
-    Logger.trace(() => `Element[${i}] geometry = ${element.calculatedSize!.join(',')}`);
+  do {
+    Logger.trace(() => `Frame[${block.animationCurrentTick}] started`);
 
-    const geometry = new THREE.BoxGeometry(...element.calculatedSize, 1, 1, 1);
-    const cube = new THREE.Mesh(geometry, await constructBlockMaterial(minecraft, block, element));
+    const clean = [];
+    let i = 0;
 
-    cube.position.set(0, 0, 0);
-    cube.position.add(new THREE.Vector3(...element.from!));
-    cube.position.add(new THREE.Vector3(...element.to!));
-    cube.position.multiplyScalar(0.5);
-    cube.position.add(new THREE.Vector3(-8, -8, -8));
+    Logger.trace(() => `Element count = ${block.elements!.length}`);
 
-    Logger.trace(() => `Element[${i}] position set to ${cube.position.toArray().join(',')}`);
+    for (const element of block.elements!) {
+      Logger.trace(() => `Element[${i}] started rendering`);
+      element.calculatedSize = size(element.from!, element.to!);
 
-    if (element.rotation) {
-      const origin = mul(element.rotation.origin!, -0.0625);
-      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...invert(origin)));
+      Logger.trace(() => `Element[${i}] geometry = ${element.calculatedSize!.join(',')}`);
 
-      if (element.rotation.axis == 'y') {
-        cube.applyMatrix4(new THREE.Matrix4().makeRotationY(THREE.MathUtils.DEG2RAD * element.rotation.angle!));
-      } else if (element.rotation.axis == 'x') {
-        cube.applyMatrix4(new THREE.Matrix4().makeRotationX(THREE.MathUtils.DEG2RAD * element.rotation.angle!));
+      const geometry = new THREE.BoxGeometry(...element.calculatedSize, 1, 1, 1);
+      const cube = new THREE.Mesh(geometry, await constructBlockMaterial(minecraft, block, element));
+
+      cube.position.set(0, 0, 0);
+      cube.position.add(new THREE.Vector3(...element.from!));
+      cube.position.add(new THREE.Vector3(...element.to!));
+      cube.position.multiplyScalar(0.5);
+      cube.position.add(new THREE.Vector3(-8, -8, -8));
+
+      Logger.trace(() => `Element[${i}] position set to ${cube.position.toArray().join(',')}`);
+
+      if (element.rotation) {
+        const origin = mul(element.rotation.origin!, -0.0625);
+        cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...invert(origin)));
+
+        if (element.rotation.axis == 'y') {
+          cube.applyMatrix4(new THREE.Matrix4().makeRotationY(THREE.MathUtils.DEG2RAD * element.rotation.angle!));
+        } else if (element.rotation.axis == 'x') {
+          cube.applyMatrix4(new THREE.Matrix4().makeRotationX(THREE.MathUtils.DEG2RAD * element.rotation.angle!));
+        }
+
+        cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin));
+        cube.updateMatrix();
+
+        Logger.trace(() => `Element[${i}] rotation applied`);
       }
 
-      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin));
-      cube.updateMatrix();
+      cube.renderOrder = ++i;
 
-      Logger.trace(() => `Element[${i}] rotation applied`);
+      scene.add(cube);
+      clean.push(cube);
     }
 
-    cube.renderOrder = ++i;
+    const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(195, -90, -45));
+    camera.position.set(...rotation.toArray().map(x => Math.sin(x * THREE.MathUtils.DEG2RAD) * 16) as [number, number, number]);
+    camera.lookAt(0, 0, 0);
+    camera.position.add(new THREE.Vector3(...gui.translation));
+    camera.updateMatrix();
+    camera.updateProjectionMatrix();
 
-    scene.add(cube);
-    clean.push(cube);
+    Logger.trace(() => `Camera position set ${camera.position.toArray().join(',')}`);
+
+    renderer.render(scene, camera);
+
+    const buffer = canvas.toBuffer('image/png');
+    buffers.push(buffer);
+
+    Logger.trace(() => `Image rendered, buffer size = ${buffer.byteLength} bytes`);
+
+    for (const old of clean) {
+      scene.remove(old);
+    }
+
+    Logger.trace(() => `Scene cleared`);
+
+    Logger.trace(() => `Frame[${block.animationCurrentTick}] completed`);
   }
+  while (options.animation && (block.animationMaxTicks ?? 1) > ++block.animationCurrentTick);
 
-  const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(195, -90, -45));
-  camera.position.set(...rotation.toArray().map(x => Math.sin(x * THREE.MathUtils.DEG2RAD) * 16) as [number, number, number]);
-  camera.lookAt(0, 0, 0);
-  camera.position.add(new THREE.Vector3(...gui.translation));
-  camera.updateMatrix();
-  camera.updateProjectionMatrix();
+  resultBlock.buffer = buffers.length == 1 ? buffers[0] : makeAnimatedPNG(buffers, index => ({ numerator: 1, denominator: 10 }));
 
-  Logger.trace(() => `Camera position set ${camera.position.toArray().join(',')}`);
-
-  renderer.render(scene, camera);
-
-  const buffer = canvas.toBuffer('image/png');
-
-  Logger.trace(() => `Image rendered, buffer size = ${buffer.byteLength} bytes`);
-
-  for (const old of clean) {
-    scene.remove(old);
-  }
-
-  Logger.trace(() => `Scene cleared`);
-
-  resultBlock.buffer = buffer;
   return resultBlock;
 }
 
 
-
-async function constructTextureMaterial(minecraft: Minecraft, path: string, face: Face, element: Element, direction: string) {
+async function constructTextureMaterial(minecraft: Minecraft, block: BlockModel, path: string, face: Face, element: Element, direction: string) {
   const cache = minecraft.getRenderer().textureCache;
   const animatedCache = minecraft.getRenderer().animatedCache;
   const image = cache[path] ? cache[path] : (cache[path] = await loadImage(await minecraft.getTextureFile(path)));
 
-  // Animated texture hack
-  // Texture animation is achieved via filmstrip 
-  // (multiple images, concated one under another) and a .mcmeta file with timing info
-  // We Check for that file, and return the contents or FALSE
-  // if the animation metadata is found, we force height = width,
-  // This fixes the texture mapping
-  // For properly animations, we would need to calculate the number of frames (height / width), then render each one.
-  // and then stitch together (note: interpolation is also a value in the metadata)
-  const isAnimated = animatedCache[path] ? animatedCache[path] : animatedCache[path] = (animatedCache[path] = await minecraft.getTextureMetadata(path));
-  const width = image.width;
-  const height = isAnimated !== false ? width : image.height;
+  const animationMeta = animatedCache[path] ? animatedCache[path] : (animatedCache[path] = await minecraft.getTextureMetadata(path));
 
-  if (isAnimated) {
+  const width = image.width;
+  let height = animationMeta ? width : image.height;
+  let frame = 0;
+
+  if (animationMeta) { // TODO: Consider custom frame times
     Logger.trace(() => `Face[${direction}] is animated!`);
+
+    const frameCount = image.height / width;
+
+    if (block.animationCurrentTick == 0) {
+      block.animationMaxTicks = Math.max(block.animationMaxTicks || 1, frameCount * (animationMeta.frametime || 1));
+    } else {
+      frame = Math.floor(block.animationCurrentTick! / (animationMeta.frametime || 1)) % frameCount;
+    }
   }
 
   const canvas = rawCanvas.createCanvas(width, height);
@@ -191,7 +216,7 @@ async function constructTextureMaterial(minecraft: Minecraft, path: string, face
 
   const uv = face.uv ?? [0, 0, width, height];
 
-  ctx.drawImage(image, uv[0], uv[1], uv[2] - uv[0], uv[3] - uv[1], 0, 0, width, height);
+  ctx.drawImage(image, uv[0], uv[1] + frame * height, uv[2] - uv[0], uv[3] - uv[1], 0, 0, width, height);
 
   Logger.trace(() => `Face[${direction}] uv applied`);
 
@@ -210,7 +235,7 @@ async function constructTextureMaterial(minecraft: Minecraft, path: string, face
     roughness: 1,
     metalness: 0,
     emissive: 1,
-    alphaTest: 0.2
+    alphaTest: 0.1
   });
 }
 
@@ -237,7 +262,7 @@ async function decodeFace(direction: string, face: Face | null | undefined, bloc
     return null;
   }
 
-  return await constructTextureMaterial(minecraft, decodedTexture!, face!, element, direction);
+  return await constructTextureMaterial(minecraft, block, decodedTexture!, face!, element, direction);
 }
 
 

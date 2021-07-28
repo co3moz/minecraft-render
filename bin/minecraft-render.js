@@ -14,6 +14,7 @@ program
   .option('-d, --distance [distance]', 'distance', 20)
   .option('-v, --verbose', 'verbose', (v, p) => typeof v != 'undefined' ? v : (p + 1), Logger.categories.info)
   .option('-p, --plane', 'Debugging plane and axis', 0)
+  .option('-A, --no-animation', 'Disables apng generation')
   .version(package.version)
   .parse(process.argv);
 
@@ -41,7 +42,8 @@ async function Main() {
     height: parseInt(options.height),
     width: parseInt(options.width),
     distance: parseInt(options.distance),
-    plane: options.plane
+    plane: options.plane,
+    animation: options.animation
   };
 
   for await (const block of minecraft.render(blocks, rendererOptions)) {

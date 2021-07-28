@@ -17,7 +17,7 @@
       ],
       "type": "pwa-node",
       "env": {
-        "BLOCK_NAMES": "sea_lantern",
+        "BLOCK_NAMES": "sea_lantern,observer,command_block,slime_block,lectern,blast_furnace_on,prismarine",
         "RENDER_FOLDER": "render/",
         "LOGGER_LEVEL": "trace"
       }

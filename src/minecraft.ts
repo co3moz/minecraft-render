@@ -71,7 +71,7 @@ export class Minecraft {
   }
 
 
-  async getTextureMetadata(name: string = ''): Promise<AnimationMeta | false> {
+  async getTextureMetadata(name: string = ''): Promise<AnimationMeta | null> {
     name = name ?? '';
     if (name.startsWith('minecraft:')) {
       name = name.substring('minecraft:'.length);
@@ -82,7 +82,7 @@ export class Minecraft {
     try {
       return await this.jar.readJson(path);
     } catch (e) {
-      return false;
+      return null;
     }
   }
 

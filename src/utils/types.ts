@@ -25,6 +25,9 @@ export type BlockSides = 'all' | 'top' | 'bottom' | 'side' | 'front' | 'particle
 export interface BlockModel {
   blockName?: string
   parents?: string[]
+  animationMaxTicks?: number
+  animationCurrentTick?: number
+
 
   parent?: string
   textures?: {
@@ -66,7 +69,8 @@ export interface Renderer {
   canvas: rawCanvas.Canvas
   camera: THREE.OrthographicCamera
   textureCache: { [key: string]: any }
-  animatedCache: { [key: string]: AnimationMeta | false }
+  animatedCache: { [key: string]: AnimationMeta | null }
+  options: RendererOptions
 }
 
 export type AnimationMeta = {
@@ -83,4 +87,5 @@ export interface RendererOptions {
   distance?: number
   verbose?: number
   plane?: number
+  animation?: boolean
 }
