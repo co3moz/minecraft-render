@@ -88,20 +88,20 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
     cube.position.add(new THREE.Vector3(...element.from!));
     cube.position.add(new THREE.Vector3(...element.to!));
     cube.position.multiplyScalar(0.5);
-    cube.position.add(new THREE.Vector3(-8, -8, -8))
+    cube.position.add(new THREE.Vector3(-8, -8, -8));
 
 
     if (element.rotation) {
       const origin = mul(element.rotation.origin!, -0.0625);
-      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...invert(origin)))
+      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...invert(origin)));
 
       if (element.rotation.axis == 'y') {
-        cube.applyMatrix4(new THREE.Matrix4().makeRotationY(THREE.MathUtils.DEG2RAD * element.rotation.angle!))
+        cube.applyMatrix4(new THREE.Matrix4().makeRotationY(THREE.MathUtils.DEG2RAD * element.rotation.angle!));
       } else if (element.rotation.axis == 'x') {
-        cube.applyMatrix4(new THREE.Matrix4().makeRotationX(THREE.MathUtils.DEG2RAD * element.rotation.angle!))
+        cube.applyMatrix4(new THREE.Matrix4().makeRotationX(THREE.MathUtils.DEG2RAD * element.rotation.angle!));
       }
       
-      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin))
+      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin));
       cube.updateMatrix();
     }
 
@@ -113,7 +113,7 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 
   const rotation = new THREE.Vector3(...gui.rotation).add(new THREE.Vector3(195, -90, -45));
   camera.position.set(...rotation.toArray().map(x => Math.sin(x * THREE.MathUtils.DEG2RAD) * 16) as [number, number, number]);
-  camera.lookAt(0, 0, 0)
+  camera.lookAt(0, 0, 0);
   camera.position.add(new THREE.Vector3(...gui.translation));
   camera.updateMatrix();
   camera.updateProjectionMatrix();
@@ -195,7 +195,7 @@ async function decodeFace(face: Face | null | undefined, block: BlockModel, elem
   if (!face) return null;
   const decodedTexture = decodeTexture(face.texture, block);
   if (!decodedTexture) return null;
-  return await constructTextureMaterial(minecraft, decodedTexture!, face!, element)
+  return await constructTextureMaterial(minecraft, decodedTexture!, face!, element);
 }
 
 

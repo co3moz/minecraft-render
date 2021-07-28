@@ -22,14 +22,14 @@ export class Minecraft {
   async getBlockNameList(): Promise<string[]> {
     return (await this.jar.entries('assets/minecraft/models/block'))
       .filter(entry => entry.name.endsWith(".json"))
-      .map(entry => entry.name.slice('assets/minecraft/models/block/'.length, -('.json'.length)))
+      .map(entry => entry.name.slice('assets/minecraft/models/block/'.length, -('.json'.length)));
   }
 
   async getBlockList(): Promise<BlockModel[]> {
     return await Promise.all((await this.getBlockNameList()).map(block => this.getModel(block)));
   }
 
-  _cache: { [key: string]: any } = {}
+  _cache: { [key: string]: any } = {};
 
   async getModelFile<T = BlockModel>(name = 'block/block'): Promise<T> {
     if (name.startsWith('minecraft:')) {
@@ -51,7 +51,7 @@ export class Minecraft {
 
       return this._cache[path];
     } catch (e) {
-      throw new Error(`Unable to find model file: ${path}`)
+      throw new Error(`Unable to find model file: ${path}`);
     }
   }
 
@@ -66,7 +66,7 @@ export class Minecraft {
     try {
       return await this.jar.read(path);
     } catch (e) {
-      throw new Error(`Unable to find texture file: ${path}`)
+      throw new Error(`Unable to find texture file: ${path}`);
     }
   }
   async getTextureMetadata(name: string = ''): Promise<AnimationMeta|false> {

@@ -5,7 +5,7 @@ export function size(from: Vector, to: Vector) {
     to[0] - from[0],
     to[1] - from[1],
     to[2] - from[2]
-  ] as const
+  ] as const;
 }
 
 export function invert(v: Vector) {
@@ -13,7 +13,7 @@ export function invert(v: Vector) {
     -v[0],
     -v[1],
     -v[2],
-  ] as const
+  ] as const;
 }
 
 export function mul(v: Vector, f: number) {
@@ -21,7 +21,7 @@ export function mul(v: Vector, f: number) {
     v[0] * f,
     v[1] * f,
     v[2] * f,
-  ] as const
+  ] as const;
 }
 
 export function distance(v: Vector) {
