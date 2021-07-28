@@ -32,10 +32,12 @@ async function Main() {
   const padSize = Math.ceil(Math.log10(blocks.length));
   const totalBlocks = blocks.length.toString().padStart(padSize, '0');
 
-  for await (const block of minecraft.render(blocks, {
+  const rendererOptions = {
     height: parseInt(options.height) || 1000,
     width: parseInt(options.width) || 1000
-  })) {
+  };
+
+  for await (const block of minecraft.render(blocks, rendererOptions)) {
     const j = (++i).toString().padStart(padSize, '0');
 
     if (!block.buffer) {
