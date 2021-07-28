@@ -50,7 +50,7 @@ export async function prepareRenderer({ width = 1000, height = 1000, distance = 
     scene.add(helper);
   }
 
-  return { scene, renderer, canvas, camera, textureCache: {} };
+  return { scene, renderer, canvas, camera, textureCache: {}, animatedCache: {} };
 }
 
 export async function destroyRenderer(renderer: Renderer) {
@@ -131,24 +131,39 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 }
 
 
+
 async function constructTextureMaterial(minecraft: Minecraft, path: string, face: Face, element: Element) {
   const cache = minecraft._renderer!.textureCache;
+  const animatedCache = minecraft._renderer!.animatedCache;
   const image = cache[path] ? cache[path] : (cache[path] = await loadImage(await minecraft.getTextureFile(path)));
+  
+  // Animated texture hack
+  // Texture animation is achieved via filmstrip 
+  // (multiple images, concated one under another) and a .mcmeta file with timing info
+  // We Check for that file, and return the contents or FALSE
+  // if the animation metadata is found, we force height = width,
+  // This fixes the texture mapping
+  // For properly animations, we would need to calculate the number of frames (height / width), then render each one.
+  // and then stitch together (note: interpolation is also a value in the metadata)
+  const isAnimated = animatedCache[path] ? animatedCache[path] : animatedCache[path] = (animatedCache[path] = await minecraft.getTextureMetadata(path));
+  const width = image.width;
+  const height = isAnimated !== false ? width : image.height;
 
-  const canvas = rawCanvas.createCanvas(image.width, image.height);
+  const canvas = rawCanvas.createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
+  
   ctx.imageSmoothingEnabled = false;
 
   if (face.rotation) {
-    ctx.translate(image.width / 2, image.height / 2);
+    ctx.translate(width / 2, height / 2);
     ctx.rotate(face.rotation * THREE.MathUtils.DEG2RAD);
-    ctx.translate(-image.width / 2, -image.height / 2);
+    ctx.translate(-width / 2, -height / 2);
   }
 
-  const uv = face.uv ?? [0, 0, image.width, image.height];
+  const uv = face.uv ?? [0, 0, width, height];
 
-  ctx.drawImage(image, uv[0], uv[1], uv[2] - uv[0], uv[3] - uv[1], 0, 0, image.width, image.height);
+  ctx.drawImage(image, uv[0], uv[1], uv[2] - uv[0], uv[3] - uv[1], 0, 0, width, height);
 
   const texture = new THREE.Texture(canvas as any);
   texture.magFilter = THREE.NearestFilter;

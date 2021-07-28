@@ -65,6 +65,19 @@ export interface Renderer {
   renderer: THREE.WebGLRenderer
   canvas: rawCanvas.Canvas
   camera: THREE.OrthographicCamera
+  textureCache: { [key: string]: any },
+  animatedCache: { [key: string]: AnimationMeta | false }
+}
 
-  textureCache: { [key: string]: any }
+export type AnimationMeta = {
+  
+  interpolate?: boolean, // Generate additional frames between keyframes where frametime > 1
+
+  width?: number, //Custom dimensions for none square textures, unused in vanilla
+  height?: number,
+
+  frametime?: number, // Frame time in game ticks, default is 1
+
+  frames?: (number|{ index: number, time: number})[]
+
 }
