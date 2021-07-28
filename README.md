@@ -21,12 +21,12 @@ You can find pre-rendered assets on Github Actions artifacts. By clicking the ba
 Basic usage;
 
 ```sh
-npx minecraft-render minecraft-version.1.17.1.jar 
+npx minecraft-render minecraft-version.1.17.1.jar output-folder/
 ```
 
 ```sh
 ...
-[0168 / 1710] observer rendered to minecraft-version.1.17.1.jar\observer.png
+[0168 / 1710] observer rendered to output-folder\observer.png
 [0169 / 1710] comparator_on_subtract skipped due to "no gui"
 [0170 / 1710] template_trapdoor_open skipped due to "no gui"
 ...
