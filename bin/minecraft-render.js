@@ -5,13 +5,15 @@ const path = require('path');
 const fs = require('fs');
 const package = require('../package.json');
 const mkdirp = require('mkdirp');
-const { Minecraft } = require('../dist');
+const { Minecraft, Logger } = require('../dist');
 
 program
   .usage('<jar> [output]')
   .option('-w, --width [width]', 'width', 1000)
   .option('-t, --height [height]', 'height', 1000)
   .option('-d, --distance [distance]', 'distance', 20)
+  .option('-v, --verbose', 'verbose', (v, p) => typeof v != 'undefined' ? v : (p + 1), Logger.categories.info)
+  .option('-p, --plane', 'Debugging plane and axis', 0)
   .version(package.version)
   .parse(process.argv);
 
@@ -22,6 +24,8 @@ if (!program.args.length) {
 }
 
 async function Main() {
+  Logger.level = options.verbose;
+
   const minecraft = Minecraft.open(path.resolve(program.args[0]));
   const blocks = await minecraft.getBlockList();
   let i = 0;
@@ -36,10 +40,9 @@ async function Main() {
   const rendererOptions = {
     height: parseInt(options.height),
     width: parseInt(options.width),
-    distance: parseInt(options.distance)
+    distance: parseInt(options.distance),
+    plane: options.plane
   };
-
-  console.log(rendererOptions);
 
   for await (const block of minecraft.render(blocks, rendererOptions)) {
     const j = (++i).toString().padStart(padSize, '0');

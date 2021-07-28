@@ -14,8 +14,8 @@ export interface Transform {
 }
 
 export interface Rotation {
-  angle?: number,
-  axis?: string,
+  angle?: number
+  axis?: string
   origin?: Vector
 }
 
@@ -26,7 +26,7 @@ export interface BlockModel {
   blockName?: string
   parents?: string[]
 
-  parent?: string,
+  parent?: string
   textures?: {
     [key in BlockSides]?: string
   }
@@ -56,7 +56,7 @@ export interface Element {
 export interface Face {
   uv?: Vector4,
   texture: string,
-  rotation?: number,
+  rotation?: number
   cullface?: string
 }
 
@@ -65,19 +65,22 @@ export interface Renderer {
   renderer: THREE.WebGLRenderer
   canvas: rawCanvas.Canvas
   camera: THREE.OrthographicCamera
-  textureCache: { [key: string]: any },
+  textureCache: { [key: string]: any }
   animatedCache: { [key: string]: AnimationMeta | false }
 }
 
 export type AnimationMeta = {
-  
-  interpolate?: boolean, // Generate additional frames between keyframes where frametime > 1
-
-  width?: number, //Custom dimensions for none square textures, unused in vanilla
+  interpolate?: boolean // Generate additional frames between keyframes where frametime > 1
+  width?: number //Custom dimensions for none square textures, unused in vanilla
   height?: number,
-
-  frametime?: number, // Frame time in game ticks, default is 1
-
+  frametime?: number // Frame time in game ticks, default is 1
   frames?: (number|{ index: number, time: number})[]
+}
 
+export interface RendererOptions {
+  width?: number
+  height?: number
+  distance?: number
+  verbose?: number
+  plane?: number
 }

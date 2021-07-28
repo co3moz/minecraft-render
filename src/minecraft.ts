@@ -1,11 +1,13 @@
-import { destroyRenderer, prepareRenderer, render, RendererOptions } from "./render";
+import { destroyRenderer, prepareRenderer, render } from "./render";
 import { Jar } from "./utils/jar";
-import type { AnimationMeta, BlockModel, Renderer } from "./utils/types";
+import type { AnimationMeta, BlockModel, Renderer, RendererOptions } from "./utils/types";
 //@ts-ignore
 import * as deepAssign from 'assign-deep';
 
 export class Minecraft {
   protected jar: Jar
+  protected renderer!: Renderer | null;
+  protected _cache: { [key: string]: any } = {};
 
   protected constructor(public file: string | Jar) {
     if (file instanceof Jar) {
@@ -28,8 +30,6 @@ export class Minecraft {
   async getBlockList(): Promise<BlockModel[]> {
     return await Promise.all((await this.getBlockNameList()).map(block => this.getModel(block)));
   }
-
-  _cache: { [key: string]: any } = {};
 
   async getModelFile<T = BlockModel>(name = 'block/block'): Promise<T> {
     if (name.startsWith('minecraft:')) {
@@ -69,7 +69,9 @@ export class Minecraft {
       throw new Error(`Unable to find texture file: ${path}`);
     }
   }
-  async getTextureMetadata(name: string = ''): Promise<AnimationMeta|false> {
+
+
+  async getTextureMetadata(name: string = ''): Promise<AnimationMeta | false> {
     name = name ?? '';
     if (name.startsWith('minecraft:')) {
       name = name.substring('minecraft:'.length);
@@ -80,12 +82,11 @@ export class Minecraft {
     try {
       return await this.jar.readJson(path);
     } catch (e) {
-      return false; 
+      return false;
     }
   }
 
   async *render(blocks: BlockModel[], options?: RendererOptions) {
-
     try {
       await this.prepareRenderEnvironment(options);
 
@@ -117,15 +118,16 @@ export class Minecraft {
     await this.jar.close();
   }
 
-  _renderer!: Renderer | null;
-
-  async prepareRenderEnvironment(options: RendererOptions = { }) {
-    this._renderer = await prepareRenderer(options)
+  async prepareRenderEnvironment(options: RendererOptions = {}) {
+    this.renderer = await prepareRenderer(options)
   }
 
   async cleanupRenderEnvironment() {
-    await destroyRenderer(this._renderer!);
-    this._renderer = null;
+    await destroyRenderer(this.renderer!);
+    this.renderer = null;
   }
 
+  getRenderer() {
+    return this.renderer!;
+  }
 }

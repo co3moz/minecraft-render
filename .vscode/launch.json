@@ -15,7 +15,12 @@
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "type": "pwa-node"
+      "type": "pwa-node",
+      "env": {
+        "BLOCK_NAMES": "sea_lantern",
+        "RENDER_FOLDER": "render/",
+        "LOGGER_LEVEL": "trace"
+      }
     }
   ]
 }
