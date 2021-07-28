@@ -1,6 +1,6 @@
 {
   "name": "minecraft-render",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Minecraft gui block/item renderer",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
