@@ -1,12 +1,12 @@
 {
   "name": "minecraft-render",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Minecraft gui block/item renderer",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "nole -L ./src/**/*.test.ts"
+    "test": "nole ./src/**/*.test.ts"
   },
   "bin": {
     "minecraft-render": "./bin/minecraft-render.js"
