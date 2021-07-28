@@ -4,8 +4,8 @@ const program = require('commander');
 const path = require('path');
 const fs = require('fs');
 const package = require('../package.json');
+const mkdirp = require('mkdirp');
 const { Minecraft } = require('../dist');
-const { cwd } = require('process');
 
 program
   .usage('<jar> [output]')
@@ -21,25 +21,21 @@ if (!program.args.length) {
 }
 
 async function Main() {
-  const minecraft = Minecraft.open(path.resolve(cwd(), program.args[0]));
+  const minecraft = Minecraft.open(path.resolve(program.args[0]));
   const blocks = await minecraft.getBlockList();
   let i = 0;
 
-  const folder = path.resolve(cwd(), path.basename(path.resolve(cwd(), program.args[1] || 'output')));
+  const folder = path.resolve(program.args[1] || 'output');
 
-  if (!fs.existsSync(folder)) {
-    await fs.promises.mkdir(folder);
-  }
+  await mkdirp(folder);
 
   const padSize = Math.ceil(Math.log10(blocks.length));
   const totalBlocks = blocks.length.toString().padStart(padSize, '0');
 
-  const rendererOptions = {
+  for await (const block of minecraft.render(blocks, {
     height: parseInt(options.height) || 1000,
     width: parseInt(options.width) || 1000
-  };
-
-  for await (const block of minecraft.render(blocks, rendererOptions)) {
+  })) {
     const j = (++i).toString().padStart(padSize, '0');
 
     if (!block.buffer) {
@@ -47,7 +43,7 @@ async function Main() {
       continue;
     }
 
-    const filePath = path.resolve(`${folder}/${block.blockName}.png`);
+    const filePath = path.join(folder, block.blockName + '.png');
     await fs.promises.writeFile(filePath, block.buffer);
 
     console.log(`[${j} / ${totalBlocks}] ${block.blockName} rendered to ${filePath}`);
