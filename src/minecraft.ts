@@ -41,7 +41,7 @@ export class Minecraft {
   async getBlockNameList(namespace = this.defaultNamespace): Promise<string[]> {
     return (await this.jar.entries(`assets/${namespace}/models/block`))
       .filter((entry) => entry.name.endsWith(".json"))
-      .map((entry) =>
+      .map((entry) => namespace + ':' +
         entry.name.slice(
           `assets/${namespace}/models/block/`.length,
           -".json".length
@@ -82,7 +82,7 @@ export class Minecraft {
   async getTextureFile(name: string = "") {
     const { namespace, id } = this.id(name);
 
-    const path = `assets/${namespace}/textures/${name}.png`;
+    const path = `assets/${namespace}/textures/${id}.png`;
 
     try {
       return await this.jar.read(path);
