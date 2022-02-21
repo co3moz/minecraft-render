@@ -1,15 +1,23 @@
 //@ts-ignore
-import * as deepAssign from 'assign-deep';
+import * as deepAssign from "assign-deep";
 import { destroyRenderer, prepareRenderer, render } from "./render";
 import { Jar } from "./utils/jar";
-import type { AnimationMeta, BlockModel, Renderer, RendererOptions } from "./utils/types";
+import type {
+  AnimationMeta,
+  BlockModel,
+  Renderer,
+  RendererOptions
+} from "./utils/types";
 
 export class Minecraft {
-  protected jar: Jar
+  protected jar: Jar;
   protected renderer!: Renderer | null;
   protected _cache: { [key: string]: any } = {};
 
-  protected constructor(public file: string | Jar, public readonly namespace = 'minecraft') {
+  protected constructor(
+    public file: string | Jar,
+    protected readonly defaultNamespace = "minecraft"
+  ) {
     if (file instanceof Jar) {
       this.jar = file;
     } else {
@@ -17,30 +25,46 @@ export class Minecraft {
     }
   }
 
+  protected id(name: string) {
+    if (name.includes(":")) {
+      const [namespace, id] = name.split(":");
+      return { namespace, id };
+    } else {
+      return { namespace: "minecraft", id: name };
+    }
+  }
+
   static open(file: string | Jar, namespace?: string) {
     return new Minecraft(file, namespace);
   }
 
-  async getBlockNameList(): Promise<string[]> {
-    return (await this.jar.entries(`assets/${this.namespace}/models/block`))
-      .filter(entry => entry.name.endsWith(".json"))
-      .map(entry => entry.name.slice(`assets/${this.namespace}/models/block/`.length, -('.json'.length)));
+  async getBlockNameList(namespace = this.defaultNamespace): Promise<string[]> {
+    return (await this.jar.entries(`assets/${namespace}/models/block`))
+      .filter((entry) => entry.name.endsWith(".json"))
+      .map((entry) =>
+        entry.name.slice(
+          `assets/${namespace}/models/block/`.length,
+          -".json".length
+        )
+      );
   }
 
-  async getBlockList(): Promise<BlockModel[]> {
-    return await Promise.all((await this.getBlockNameList()).map(block => this.getModel(block)));
+  async getBlockList(namespace = this.defaultNamespace): Promise<BlockModel[]> {
+    return await Promise.all(
+      (
+        await this.getBlockNameList(namespace)
+      ).map((block) => this.getModel(block))
+    );
   }
 
-  async getModelFile<T = BlockModel>(name = 'block/block'): Promise<T> {
-    if (name.startsWith(`${this.namespace}:`)) {
-      name = name.substring(`${this.namespace}:`.length);
+  async getModelFile<T = BlockModel>(name = "block/block"): Promise<T> {
+    let { namespace, id } = this.id(name);
+
+    if (id.indexOf("/") == -1) {
+      id = `block/${id}`;
     }
 
-    if (name.indexOf('/') == -1) {
-      name = `block/${name}`;
-    }
-
-    const path = `assets/${this.namespace}/models/${name}.json`;
+    const path = `assets/${namespace}/models/${id}.json`;
 
     try {
       if (this._cache[path]) {
@@ -55,13 +79,10 @@ export class Minecraft {
     }
   }
 
-  async getTextureFile(name: string = '') {
-    name = name ?? '';
-    if (name.startsWith(`${this.namespace}:`)) {
-      name = name.substring(`${this.namespace}:`.length);
-    }
+  async getTextureFile(name: string = "") {
+    const { namespace, id } = this.id(name);
 
-    const path = `assets/${this.namespace}/textures/${name}.png`;
+    const path = `assets/${namespace}/textures/${name}.png`;
 
     try {
       return await this.jar.read(path);
@@ -70,14 +91,10 @@ export class Minecraft {
     }
   }
 
+  async getTextureMetadata(name: string = ""): Promise<AnimationMeta | null> {
+    const { namespace, id } = this.id(name);
 
-  async getTextureMetadata(name: string = ''): Promise<AnimationMeta | null> {
-    name = name ?? '';
-    if (name.startsWith(`${this.namespace}:`)) {
-      name = name.substring(`${this.namespace}:`.length);
-    }
-
-    const path = `assets/${this.namespace}/textures/${name}.png.mcmeta`;
+    const path = `assets/${namespace}/textures/${name}.png.mcmeta`;
 
     try {
       return await this.jar.readJson(path);
@@ -119,7 +136,7 @@ export class Minecraft {
   }
 
   async prepareRenderEnvironment(options: RendererOptions = {}) {
-    this.renderer = await prepareRenderer(options)
+    this.renderer = await prepareRenderer(options);
   }
 
   async cleanupRenderEnvironment() {
