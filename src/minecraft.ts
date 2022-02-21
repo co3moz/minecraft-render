@@ -17,8 +17,8 @@ export class Minecraft {
     }
   }
 
-  static open(file: string | Jar) {
-    return new Minecraft(file);
+  static open(file: string | Jar, namespace?: string) {
+    return new Minecraft(file, namespace);
   }
 
   async getBlockNameList(): Promise<string[]> {
