@@ -1,15 +1,15 @@
+//@ts-ignore
+import * as deepAssign from 'assign-deep';
 import { destroyRenderer, prepareRenderer, render } from "./render";
 import { Jar } from "./utils/jar";
 import type { AnimationMeta, BlockModel, Renderer, RendererOptions } from "./utils/types";
-//@ts-ignore
-import * as deepAssign from 'assign-deep';
 
 export class Minecraft {
   protected jar: Jar
   protected renderer!: Renderer | null;
   protected _cache: { [key: string]: any } = {};
 
-  protected constructor(public file: string | Jar) {
+  protected constructor(public file: string | Jar, public readonly namespace = 'minecraft') {
     if (file instanceof Jar) {
       this.jar = file;
     } else {
@@ -22,9 +22,9 @@ export class Minecraft {
   }
 
   async getBlockNameList(): Promise<string[]> {
-    return (await this.jar.entries('assets/minecraft/models/block'))
+    return (await this.jar.entries(`assets/${this.namespace}/models/block`))
       .filter(entry => entry.name.endsWith(".json"))
-      .map(entry => entry.name.slice('assets/minecraft/models/block/'.length, -('.json'.length)));
+      .map(entry => entry.name.slice(`assets/${this.namespace}/models/block/`.length, -('.json'.length)));
   }
 
   async getBlockList(): Promise<BlockModel[]> {
@@ -32,15 +32,15 @@ export class Minecraft {
   }
 
   async getModelFile<T = BlockModel>(name = 'block/block'): Promise<T> {
-    if (name.startsWith('minecraft:')) {
-      name = name.substring('minecraft:'.length);
+    if (name.startsWith(`${this.namespace}:`)) {
+      name = name.substring(`${this.namespace}:`.length);
     }
 
     if (name.indexOf('/') == -1) {
       name = `block/${name}`;
     }
 
-    const path = `assets/minecraft/models/${name}.json`;
+    const path = `assets/${this.namespace}/models/${name}.json`;
 
     try {
       if (this._cache[path]) {
@@ -57,11 +57,11 @@ export class Minecraft {
 
   async getTextureFile(name: string = '') {
     name = name ?? '';
-    if (name.startsWith('minecraft:')) {
-      name = name.substring('minecraft:'.length);
+    if (name.startsWith(`${this.namespace}:`)) {
+      name = name.substring(`${this.namespace}:`.length);
     }
 
-    const path = `assets/minecraft/textures/${name}.png`;
+    const path = `assets/${this.namespace}/textures/${name}.png`;
 
     try {
       return await this.jar.read(path);
@@ -73,11 +73,11 @@ export class Minecraft {
 
   async getTextureMetadata(name: string = ''): Promise<AnimationMeta | null> {
     name = name ?? '';
-    if (name.startsWith('minecraft:')) {
-      name = name.substring('minecraft:'.length);
+    if (name.startsWith(`${this.namespace}:`)) {
+      name = name.substring(`${this.namespace}:`.length);
     }
 
-    const path = `assets/minecraft/textures/${name}.png.mcmeta`;
+    const path = `assets/${this.namespace}/textures/${name}.png.mcmeta`;
 
     try {
       return await this.jar.readJson(path);

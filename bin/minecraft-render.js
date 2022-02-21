@@ -16,6 +16,7 @@ program
   .option('-p, --plane', 'debugging plane and axis', 0)
   .option('-A, --no-animation', 'disables apng generation')
   .option('-f, --filter <regex>', 'regex pattern to filter blocks by name')
+  .option('-n, --namespace <regex>', 'namespace of the models', 'minecraft')
   .version(package.version)
   .parse(process.argv);
 
@@ -28,7 +29,7 @@ if (!program.args.length) {
 async function Main() {
   Logger.level = options.verbose;
 
-  const minecraft = Minecraft.open(path.resolve(program.args[0]));
+  const minecraft = Minecraft.open(path.resolve(program.args[0]), options.namespace);
   const blocks = filterByRegex(options.filter, await minecraft.getBlockList());
 
   let i = 0;
