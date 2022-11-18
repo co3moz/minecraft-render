@@ -3,7 +3,7 @@
 const program = require('commander');
 const path = require('path');
 const fs = require('fs');
-const package = require('../package.json');
+const pkg = require('../package.json');
 const mkdirp = require('mkdirp');
 const { Minecraft, Logger } = require('../dist');
 
@@ -16,7 +16,7 @@ program
   .option('-p, --plane', 'debugging plane and axis', 0)
   .option('-A, --no-animation', 'disables apng generation')
   .option('-f, --filter <regex>', 'regex pattern to filter blocks by name')
-  .version(package.version)
+  .version(pkg.version)
   .parse(process.argv);
 
 const options = program.opts();
