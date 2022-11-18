@@ -1,6 +1,6 @@
 import { Dependency, Spec } from 'nole';
-import { Minecraft } from '../minecraft';
-import { JarTest } from './jar.test';
+import { Minecraft } from '../minecraft.js';
+import { JarTest } from './jar.test.js';
 
 export class MinecraftTest {
   @Dependency(JarTest)

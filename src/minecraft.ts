@@ -1,8 +1,7 @@
-import { destroyRenderer, prepareRenderer, render } from "./render";
-import { Jar } from "./utils/jar";
-import type { AnimationMeta, BlockModel, Renderer, RendererOptions } from "./utils/types";
-//@ts-ignore
-import * as deepAssign from 'assign-deep';
+import { destroyRenderer, prepareRenderer, render } from './render.js';
+import { Jar } from './utils/jar.js';
+import type { AnimationMeta, BlockModel, Renderer, RendererOptions } from './utils/types.js';
+import merge from 'lodash/merge.js';
 
 export class Minecraft {
   protected jar: Jar
@@ -102,7 +101,7 @@ export class Minecraft {
     let { parent, ...model } = await this.getModelFile(blockName);
 
     if (parent) {
-      model = deepAssign({}, await this.getModel(parent), model);
+      model = merge({}, await this.getModel(parent), model);
 
       if (!model.parents) {
         model.parents = [];
@@ -111,7 +110,7 @@ export class Minecraft {
       model.parents.push(parent);
     }
 
-    return deepAssign(model, { blockName });
+    return merge(model, { blockName });
   }
 
   async close() {
@@ -123,7 +122,8 @@ export class Minecraft {
   }
 
   async cleanupRenderEnvironment() {
-    await destroyRenderer(this.renderer!);
+    if (!this.renderer) return;
+    await destroyRenderer(this.renderer);
     this.renderer = null;
   }
 

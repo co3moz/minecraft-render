@@ -1,7 +1,6 @@
 import { Dependency, Hook, HookType, Spec } from 'nole';
-import { Jar } from '../utils/jar';
-import * as path from 'path';
-import { DownloadTest } from './download.test';
+import { Jar } from '../utils/jar.js';
+import { DownloadTest } from './download.test.js';
 
 export class JarTest {
   @Dependency(DownloadTest)
