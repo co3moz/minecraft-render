@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-const program = require('commander');
-const path = require('path');
-const fs = require('fs');
-const pkg = require('../package.json');
-const mkdirp = require('mkdirp');
-const { Minecraft, Logger } = require('../dist');
+import path from 'path';
+import fs from 'fs';
+import mkdirp from 'mkdirp';
+import { program } from 'commander';
+import { Minecraft, Logger } from '../dist/index.js';
 
 program
   .usage('<jar> [output]')
@@ -16,7 +15,7 @@ program
   .option('-p, --plane', 'debugging plane and axis', 0)
   .option('-A, --no-animation', 'disables apng generation')
   .option('-f, --filter <regex>', 'regex pattern to filter blocks by name')
-  .version(pkg.version)
+  .version(JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url))).version)
   .parse(process.argv);
 
 const options = program.opts();
