@@ -21,10 +21,6 @@ program
 
 const options = program.opts();
 
-if (!program.args.length) {
-  return program.help();
-}
-
 async function Main() {
   Logger.level = options.verbose;
 
@@ -72,4 +68,8 @@ function filterByRegex(pattern, array) {
   return array.filter(block => regex.test(block.blockName));
 }
 
-Main().catch(e => console.error('Rendering failed!', e));
+if (program.args.length) {
+  Main().catch(e => console.error('Rendering failed!', e));
+} else {
+  program.help();
+}
