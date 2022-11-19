@@ -68,6 +68,7 @@ export interface Renderer {
   scene: THREE.Scene
   renderer: THREE.WebGLRenderer
   canvas: rawCanvas.Canvas
+  canvasContext: rawCanvas.CanvasRenderingContext2D
   context: ReturnType<typeof gl>
   camera: THREE.OrthographicCamera
   textureCache: { [key: string]: rawCanvas.Image }

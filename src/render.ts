@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import * as rawCanvas from 'canvas';
 import gl from 'gl';
-import sharp from 'sharp';
 import type { BlockModel, BlockSides, Element, Face, Renderer, RendererOptions } from './utils/types.js';
 import type { Minecraft } from './minecraft.js';
 import { distance, invert, mul, size } from './utils/vector-math.js';
@@ -61,6 +60,7 @@ export async function prepareRenderer({ width = 1000, height = 1000, distance = 
     camera,
     textureCache: {},
     animatedCache: {},
+    canvasContext: canvas.getContext('2d'),
     options: { width, height, distance, plane, animation }
   };
 }
@@ -77,7 +77,7 @@ export async function destroyRenderer(renderer: Renderer) {
 
 
 export async function render(minecraft: Minecraft, block: BlockModel): Promise<BlockModel & { buffer: Buffer, skip?: string }> {
-  const { context, renderer, scene, camera, options } = minecraft.getRenderer()!;
+  const { context, canvasContext, canvas, renderer, scene, camera, options } = minecraft.getRenderer()!;
   const resultBlock: BlockModel & { buffer: Buffer, skip?: string } = block as any;
 
   const gui = block.display?.gui;
@@ -102,7 +102,9 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
   const { width, height } = options as { width: number, height: number };
 
   const buffers = [];
+  const tempBuffer = new Uint8Array(4 * width);
   const pixels = new Uint8Array(4 * width * height);
+  const data = new rawCanvas.ImageData(width, height);
 
   do {
     Logger.trace(() => `Frame[${block.animationCurrentTick}] started`);
@@ -161,9 +163,9 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
     Logger.trace(() => `Camera position set ${camera.position.toArray().join(',')}`);
 
     renderer.render(scene, camera);
-    context.readPixels(0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, pixels);
+    putImageData(context, canvasContext, tempBuffer, pixels, data, width, height);
 
-    const buffer = await sharp(Buffer.from(pixels.buffer), { raw: { width, height, channels: 4 } }).flip().png().toBuffer();
+    const buffer = canvas.toBuffer();
     buffers.push(buffer);
 
     Logger.trace(() => `Image rendered, buffer size = ${buffer.byteLength} bytes`);
@@ -286,4 +288,29 @@ function decodeTexture(texture: string, block: BlockModel): string | null {
   Logger.trace(() => `Texture "${texture}" decoded to "${correctedTextureName}"`);
 
   return decodeTexture(correctedTextureName, block);
+}
+
+
+function putImageData(gl: WebGLRenderingContext, canvasContext: rawCanvas.CanvasRenderingContext2D, tempBuffer: Uint8Array, pixels: Uint8Array, data: rawCanvas.ImageData, width: number, height: number) {
+  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+  const halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
+  const bytesPerRow = width * 4;
+
+  for (let y = 0; y < halfHeight; ++y) {
+    const topOffset = y * bytesPerRow;
+    const bottomOffset = (height - y - 1) * bytesPerRow;
+  
+    // make copy of a row on the top half
+    tempBuffer.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
+  
+    // copy a row from the bottom half to the top
+    pixels.copyWithin(topOffset, bottomOffset, bottomOffset + bytesPerRow);
+  
+    // copy the copy of the top half row to the bottom half 
+    pixels.set(tempBuffer, bottomOffset);
+  }
+
+  data.data.set(pixels);
+  canvasContext.putImageData(data, 0, 0);
 }
