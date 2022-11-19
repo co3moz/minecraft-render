@@ -1,11 +1,10 @@
 import { Dependency, Skip, Spec } from 'nole';
-import { MinecraftTest } from './minecraft.test';
+import { MinecraftTest } from './minecraft.test.js';
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { BlockModel } from '../utils/types';
-import { Logger } from '../utils/logger';
-
+import { BlockModel } from '../utils/types.js';
+import { Logger } from '../utils/logger.js';
 
 export class RenderTest {
   @Dependency(MinecraftTest)
@@ -23,9 +22,7 @@ export class RenderTest {
         continue;
       }
 
-      const filePath = path.resolve(__dirname, `../../test-data/${process.env.RENDER_FOLDER || ''}${render.blockName}.png`);
-
-      await writeAsync(filePath, render.buffer);
+      await writeAsync(`test-data/${process.env.RENDER_FOLDER || ''}${render.blockName}.png`, render.buffer);
     }
   }
 }

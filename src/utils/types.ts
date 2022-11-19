@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type * as rawCanvas from 'canvas';
+import type gl from 'gl';
 
 export type UnwrapPromise<T> = T extends PromiseLike<infer U> ? U : T
 export type UnwrapArray<T> = T extends Array<infer U> ? U : T
@@ -67,8 +68,10 @@ export interface Renderer {
   scene: THREE.Scene
   renderer: THREE.WebGLRenderer
   canvas: rawCanvas.Canvas
+  canvasContext: rawCanvas.CanvasRenderingContext2D
+  context: ReturnType<typeof gl>
   camera: THREE.OrthographicCamera
-  textureCache: { [key: string]: any }
+  textureCache: { [key: string]: rawCanvas.Image }
   animatedCache: { [key: string]: AnimationMeta | null }
   options: RendererOptions
 }

@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-const program = require('commander');
-const path = require('path');
-const fs = require('fs');
-const package = require('../package.json');
-const mkdirp = require('mkdirp');
-const { Minecraft, Logger } = require('../dist');
+import path from 'path';
+import fs from 'fs';
+import mkdirp from 'mkdirp';
+import { program } from 'commander';
+import { Minecraft, Logger } from '../dist/index.js';
 
 program
   .usage('<jar> [output]')
@@ -16,14 +15,10 @@ program
   .option('-p, --plane', 'debugging plane and axis', 0)
   .option('-A, --no-animation', 'disables apng generation')
   .option('-f, --filter <regex>', 'regex pattern to filter blocks by name')
-  .version(package.version)
+  .version(JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url))).version)
   .parse(process.argv);
 
 const options = program.opts();
-
-if (!program.args.length) {
-  return program.help();
-}
 
 async function Main() {
   Logger.level = options.verbose;
@@ -72,4 +67,8 @@ function filterByRegex(pattern, array) {
   return array.filter(block => regex.test(block.blockName));
 }
 
-Main().catch(e => console.error('Rendering failed!', e));
+if (program.args.length) {
+  Main().catch(e => console.error('Rendering failed!', e));
+} else {
+  program.help();
+}

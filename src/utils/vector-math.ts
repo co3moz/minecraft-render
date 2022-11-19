@@ -1,4 +1,4 @@
-import { Vector } from './types';
+import { Vector } from './types.js';
 
 export function size(from: Vector, to: Vector) {
   return [

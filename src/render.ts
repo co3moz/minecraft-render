@@ -1,24 +1,25 @@
 import * as THREE from 'three';
 import * as rawCanvas from 'canvas';
-import type { BlockModel, BlockSides, Element, Face, Renderer, RendererOptions } from './utils/types';
-import type { Minecraft } from './minecraft';
-import { distance, invert, mul, size } from './utils/vector-math';
-import { Logger } from './utils/logger';
-//@ts-ignore
-import { createCanvas, loadImage } from 'node-canvas-webgl';
-import { makeAnimatedPNG } from './utils/apng';
+import gl from 'gl';
+import type { BlockModel, BlockSides, Element, Face, Renderer, RendererOptions } from './utils/types.js';
+import type { Minecraft } from './minecraft.js';
+import { distance, invert, mul, size } from './utils/vector-math.js';
+import { Logger } from './utils/logger.js';
+import { makeAnimatedPNG } from './utils/apng.js';
 
 const MATERIAL_FACE_ORDER = ['east', 'west', 'up', 'down', 'south', 'north'] as const;
 
 export async function prepareRenderer({ width = 1000, height = 1000, distance = 20, plane = 0, animation = true }: RendererOptions): Promise<Renderer> {
   const scene = new THREE.Scene();
+  const context = gl(width, height);
+  const canvas: any = new rawCanvas.Canvas(width, height);
 
-  const canvas: rawCanvas.Canvas = createCanvas(width, height);
+  canvas.addEventListener = () => { };
 
   Logger.debug(() => `prepareRenderer(width=${width}, height=${height}, distance=${distance})`);
-
   const renderer = new THREE.WebGLRenderer({
-    canvas: (canvas as any),
+    canvas,
+    context,
     antialias: true,
     alpha: true,
     logarithmicDepthBuffer: true,
@@ -55,9 +56,11 @@ export async function prepareRenderer({ width = 1000, height = 1000, distance = 
     scene,
     renderer,
     canvas,
+    context,
     camera,
     textureCache: {},
     animatedCache: {},
+    canvasContext: canvas.getContext('2d'),
     options: { width, height, distance, plane, animation }
   };
 }
@@ -67,14 +70,14 @@ export async function destroyRenderer(renderer: Renderer) {
 
   await new Promise(resolve => setTimeout(resolve, 500));
   renderer.renderer.info.reset();
-  (renderer.canvas as any).__gl__.getExtension('STACKGL_destroy_context').destroy();
+  renderer.context.getExtension('STACKGL_destroy_context')!.destroy();
 
   Logger.debug(() => `Renderer destroyed`);
 }
 
 
 export async function render(minecraft: Minecraft, block: BlockModel): Promise<BlockModel & { buffer: Buffer, skip?: string }> {
-  const { canvas, renderer, scene, camera, options } = minecraft.getRenderer()!;
+  const { context, canvasContext, canvas, renderer, scene, camera, options } = minecraft.getRenderer()!;
   const resultBlock: BlockModel & { buffer: Buffer, skip?: string } = block as any;
 
   const gui = block.display?.gui;
@@ -96,7 +99,12 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 
   // block.elements!.reverse();
 
+  const { width, height } = options as { width: number, height: number };
+
   const buffers = [];
+  const tempBuffer = new Uint8Array(4 * width);
+  const pixels = new Uint8Array(4 * width * height);
+  const data = new rawCanvas.ImageData(width, height);
 
   do {
     Logger.trace(() => `Frame[${block.animationCurrentTick}] started`);
@@ -155,8 +163,9 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
     Logger.trace(() => `Camera position set ${camera.position.toArray().join(',')}`);
 
     renderer.render(scene, camera);
+    putImageData(context, canvasContext, tempBuffer, pixels, data, width, height);
 
-    const buffer = canvas.toBuffer('image/png');
+    const buffer = canvas.toBuffer();
     buffers.push(buffer);
 
     Logger.trace(() => `Image rendered, buffer size = ${buffer.byteLength} bytes`);
@@ -169,9 +178,10 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 
     Logger.trace(() => `Frame[${block.animationCurrentTick}] completed`);
   }
+
   while (options.animation && (block.animationMaxTicks ?? 1) > ++block.animationCurrentTick);
 
-  resultBlock.buffer = buffers.length == 1 ? buffers[0] : makeAnimatedPNG(buffers, index => ({ numerator: 1, denominator: 10 }));
+  resultBlock.buffer = buffers.length == 1 ? buffers[0] : makeAnimatedPNG(buffers, () => ({ numerator: 1, denominator: 10 }));
 
   return resultBlock;
 }
@@ -180,7 +190,7 @@ export async function render(minecraft: Minecraft, block: BlockModel): Promise<B
 async function constructTextureMaterial(minecraft: Minecraft, block: BlockModel, path: string, face: Face, element: Element, direction: string) {
   const cache = minecraft.getRenderer().textureCache;
   const animatedCache = minecraft.getRenderer().animatedCache;
-  const image = cache[path] ? cache[path] : (cache[path] = await loadImage(await minecraft.getTextureFile(path)));
+  const image = cache[path] ? cache[path] : (cache[path] = await rawCanvas.loadImage(await minecraft.getTextureFile(path)));
 
   const animationMeta = animatedCache[path] ? animatedCache[path] : (animatedCache[path] = await minecraft.getTextureMetadata(path));
 
@@ -278,4 +288,29 @@ function decodeTexture(texture: string, block: BlockModel): string | null {
   Logger.trace(() => `Texture "${texture}" decoded to "${correctedTextureName}"`);
 
   return decodeTexture(correctedTextureName, block);
+}
+
+
+function putImageData(gl: WebGLRenderingContext, canvasContext: rawCanvas.CanvasRenderingContext2D, tempBuffer: Uint8Array, pixels: Uint8Array, data: rawCanvas.ImageData, width: number, height: number) {
+  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+  const halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
+  const bytesPerRow = width * 4;
+
+  for (let y = 0; y < halfHeight; ++y) {
+    const topOffset = y * bytesPerRow;
+    const bottomOffset = (height - y - 1) * bytesPerRow;
+  
+    // make copy of a row on the top half
+    tempBuffer.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
+  
+    // copy a row from the bottom half to the top
+    pixels.copyWithin(topOffset, bottomOffset, bottomOffset + bytesPerRow);
+  
+    // copy the copy of the top half row to the bottom half 
+    pixels.set(tempBuffer, bottomOffset);
+  }
+
+  data.data.set(pixels);
+  canvasContext.putImageData(data, 0, 0);
 }

@@ -12,7 +12,7 @@ export class DownloadTest {
   async getManifest() {
     this.checkExistingJar();
     const response = await fetch(`https://launchermeta.mojang.com/mc/game/version_manifest.json`)
-    const manifest: VersionManifest = await response.json();
+    const manifest = (await response.json()) as VersionManifest;
     this.targetVersionUrl = manifest.versions.find(version => version.type == 'release' || version.id == manifest.latest.release)!.url;
   }
 
@@ -20,7 +20,7 @@ export class DownloadTest {
   async getVersionJarUrl() {
     this.checkExistingJar();
     const response = await fetch(this.targetVersionUrl)
-    const version: Version = await response.json();
+    const version = (await response.json()) as Version;
     this.jarUrl = version.downloads.client.url;
   }
 
@@ -34,8 +34,8 @@ export class DownloadTest {
     const stream = fs.createWriteStream(this.jarPath);
 
     await new Promise((resolve, reject) => {
-      response.body.pipe(stream)
-      response.body.on('error', reject);
+      response.body!.pipe(stream)
+      response.body!.on('error', reject);
       stream.on('close', resolve);
     });
   }
@@ -50,7 +50,7 @@ export class DownloadTest {
   }
 
   getPath() {
-    return path.resolve(__dirname, '../../test-data/test.jar');
+    return path.resolve('test-data/test.jar');
   }
 }
 

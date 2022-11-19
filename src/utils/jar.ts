@@ -1,4 +1,6 @@
-import { async, ZipEntry } from 'node-stream-zip';
+import pkg, { ZipEntry } from 'node-stream-zip';
+
+const { async } = pkg
 
 export class Jar {
   protected zip: InstanceType<typeof async>;
