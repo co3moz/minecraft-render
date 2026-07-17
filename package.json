@@ -37,6 +37,7 @@
     "three": "^0.130.1"
   },
   "devDependencies": {
+    "@types/node": "^22.20.1",
     "@types/three": "^0.130.1",
     "generic-pool": "^3.9.0",
     "mkdirp": "^1.0.4",

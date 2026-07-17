@@ -21,17 +21,18 @@ function syncWebGLToCanvas2D(gl: any, canvas: any) {
   const pixels = new Uint8Array(width * height * 4);
   gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
-  // Invert the rows because WebGL coordinates are y-up and Canvas 2D is y-down
-  for (let i = 0; i < height; i++) {
-    for (let j = 0; j < width; j++) {
-      const col = j;
-      const row = height - i - 1;
-      for (let k = 0; k < 4; k++) {
-        const idx = 4 * (row * width + col) + k;
-        const idx2 = 4 * (i * width + col) + k;
-        data.data[idx] = pixels[idx2];
-      }
-    }
+  // Invert the rows because WebGL coordinates are y-up and Canvas 2D is y-down.
+  // Copy whole rows at a time instead of iterating every pixel and channel
+  // (~width*4 fewer operations per row) — readPixels + this flip runs on the
+  // JS thread for every frame, so the naive triple loop dominated encode time.
+  const rowBytes = width * 4;
+  const dst = data.data;
+  for (let row = 0; row < height; row++) {
+    const srcStart = row * rowBytes;
+    dst.set(
+      pixels.subarray(srcStart, srcStart + rowBytes),
+      (height - row - 1) * rowBytes,
+    );
   }
 
   ctx.putImageData(data, 0, 0);
