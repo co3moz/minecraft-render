@@ -7,6 +7,7 @@ import type {
   Face,
   Renderer,
   RendererOptions,
+  Vector,
 } from './utils/types.js';
 import type { Minecraft } from './minecraft.js';
 import { distance, invert, mul, size } from './utils/vector-math.js';
@@ -64,9 +65,16 @@ export async function prepareRenderer({
     20000,
   );
 
-  const light = new THREE.DirectionalLight(0xffffff, 1.2);
+  const light = new THREE.DirectionalLight(0xffffff, 1.0);
   light.position.set(-15, 30, -25); // cube directions x => negative:bottom right, y => positive:top, z => negative:bottom left
   scene.add(light);
+
+  // Fill light so faces pointing away from the directional light are never
+  // rendered pitch black. Minecraft shades faces with a fixed per-side factor
+  // (never below ~0.5), so recessed/back-facing detail (e.g. the anvil neck)
+  // stays visible instead of collapsing into a black void.
+  const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+  scene.add(ambient);
 
   Logger.trace(() => `Light added to scene`);
 
@@ -213,18 +221,14 @@ export async function render(
             new THREE.Matrix4().makeTranslation(...invert(origin)),
           );
 
+          const angle = THREE.MathUtils.DEG2RAD * element.rotation.angle!;
+
           if (element.rotation.axis == 'y') {
-            cube.applyMatrix4(
-              new THREE.Matrix4().makeRotationY(
-                THREE.MathUtils.DEG2RAD * element.rotation.angle!,
-              ),
-            );
+            cube.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
           } else if (element.rotation.axis == 'x') {
-            cube.applyMatrix4(
-              new THREE.Matrix4().makeRotationX(
-                THREE.MathUtils.DEG2RAD * element.rotation.angle!,
-              ),
-            );
+            cube.applyMatrix4(new THREE.Matrix4().makeRotationX(angle));
+          } else if (element.rotation.axis == 'z') {
+            cube.applyMatrix4(new THREE.Matrix4().makeRotationZ(angle));
           }
 
           cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin));
@@ -381,14 +385,29 @@ async function constructTextureMaterial(
     Logger.trace(() => `Face[${direction}] rotation applied`);
   }
 
-  const uv = face.uv ?? [0, 0, width, height];
+  // When a face omits `uv`, Minecraft derives it from the element's geometry
+  // (the face's slice of the block), not the whole texture. Falling back to the
+  // full texture stretches it onto partial faces (e.g. the composter rim).
+  const uv = face.uv ?? defaultUv(direction, element.from!, element.to!);
+
+  // Minecraft allows reversed UVs where u1 > u2 (mirror horizontally) or
+  // v1 > v2 (mirror vertically). drawImage with a negative source width/height
+  // silently draws nothing, which is why such faces went missing (observer top,
+  // dried kelp / anvil sides). Normalize the source rect and mirror instead.
+  const flipX = uv[2] < uv[0];
+  const flipY = uv[3] < uv[1];
+
+  if (flipX || flipY) {
+    ctx.translate(flipX ? width : 0, flipY ? height : 0);
+    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+  }
 
   ctx.drawImage(
     image,
-    uv[0],
-    uv[1] + frame * height,
-    uv[2] - uv[0],
-    uv[3] - uv[1],
+    Math.min(uv[0], uv[2]),
+    Math.min(uv[1], uv[3]) + frame * height,
+    Math.abs(uv[2] - uv[0]),
+    Math.abs(uv[3] - uv[1]),
     0,
     0,
     width,
@@ -483,6 +502,34 @@ async function decodeFace(
     direction,
     activeRenderer,
   );
+}
+
+// Minecraft's default UV for a face without an explicit `uv`, derived from the
+// element bounds (in 0-16 block space, matching the vanilla 16px texture grid).
+function defaultUv(
+  direction: string,
+  from: Vector,
+  to: Vector,
+): [number, number, number, number] {
+  const [x1, y1, z1] = from;
+  const [x2, y2, z2] = to;
+
+  switch (direction) {
+    case 'down':
+      return [x1, 16 - z2, x2, 16 - z1];
+    case 'up':
+      return [x1, z1, x2, z2];
+    case 'north':
+      return [16 - x2, 16 - y2, 16 - x1, 16 - y1];
+    case 'south':
+      return [x1, 16 - y2, x2, 16 - y1];
+    case 'west':
+      return [z1, 16 - y2, z2, 16 - y1];
+    case 'east':
+      return [16 - z2, 16 - y2, 16 - z1, 16 - y1];
+    default:
+      return [0, 0, 16, 16];
+  }
 }
 
 function decodeTexture(texture: any, block: BlockModel): string | null {
