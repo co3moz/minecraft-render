@@ -1,11 +1,16 @@
-import { destroyRenderer, prepareRenderer, render } from "./render";
-import { Jar } from "./utils/jar";
-import type { AnimationMeta, BlockModel, Renderer, RendererOptions } from "./utils/types";
+import { destroyRenderer, prepareRenderer, render } from './render.js';
+import { Jar } from './utils/jar.js';
+import type {
+  AnimationMeta,
+  BlockModel,
+  Renderer,
+  RendererOptions,
+} from './utils/types.js';
 //@ts-ignore
 import deepAssign from 'assign-deep';
 
 export class Minecraft {
-  protected jar: Jar
+  protected jar: Jar;
   protected renderer!: Renderer | null;
   protected _cache: { [key: string]: any } = {};
 
@@ -23,12 +28,19 @@ export class Minecraft {
 
   async getBlockNameList(): Promise<string[]> {
     return (await this.jar.entries('assets/minecraft/models/block'))
-      .filter(entry => entry.name.endsWith(".json"))
-      .map(entry => entry.name.slice('assets/minecraft/models/block/'.length, -('.json'.length)));
+      .filter((entry) => entry.name.endsWith('.json'))
+      .map((entry) =>
+        entry.name.slice(
+          'assets/minecraft/models/block/'.length,
+          -'.json'.length,
+        ),
+      );
   }
 
   async getBlockList(): Promise<BlockModel[]> {
-    return await Promise.all((await this.getBlockNameList()).map(block => this.getModel(block)));
+    return await Promise.all(
+      (await this.getBlockNameList()).map((block) => this.getModel(block)),
+    );
   }
 
   async getModelFile<T = BlockModel>(name = 'block/block'): Promise<T> {
@@ -69,7 +81,6 @@ export class Minecraft {
       throw new Error(`Unable to find texture file: ${path}`);
     }
   }
-
 
   async getTextureMetadata(name: string = ''): Promise<AnimationMeta | null> {
     name = name ?? '';
@@ -119,7 +130,7 @@ export class Minecraft {
   }
 
   async prepareRenderEnvironment(options: RendererOptions = {}) {
-    this.renderer = await prepareRenderer(options)
+    this.renderer = await prepareRenderer(options);
   }
 
   async cleanupRenderEnvironment() {

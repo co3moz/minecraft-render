@@ -7,14 +7,9 @@
     {
       "name": "Launch via NPM",
       "request": "launch",
-      "runtimeArgs": [
-        "run-script",
-        "test"
-      ],
+      "runtimeArgs": ["run-script", "test"],
       "runtimeExecutable": "npm",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "type": "pwa-node",
       "env": {
         "BLOCK_NAMES": "sea_lantern,observer,command_block,slime_block,lectern,blast_furnace_on,prismarine",

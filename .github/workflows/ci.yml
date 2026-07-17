@@ -7,19 +7,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v2
-      with:
-        node-version: '14'
-        cache: 'npm'
-    - run: npm install
-    - run: sudo apt-get install xvfb
-    - run: xvfb-run --auto-servernum npm test
-    - name: Archive production artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: test-result
-        path: |
-          test-data/*
-          !test-data/test.jar
-          !test-data/.gitignore
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          cache: 'npm'
+      - run: npm install
+      - run: sudo apt-get install xvfb
+      - run: xvfb-run --auto-servernum npm test
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-result
+          path: |
+            test-data/*
+            !test-data/test.jar
+            !test-data/.gitignore

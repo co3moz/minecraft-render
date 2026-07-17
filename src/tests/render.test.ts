@@ -1,13 +1,13 @@
-import { Test } from "nole";
-import { MinecraftTest } from "./minecraft.test";
+import { Test } from 'nole';
+import { MinecraftTest } from './minecraft.test.js';
 
-import * as path from "path";
-import * as fs from "fs";
-import { BlockModel } from "../utils/types";
-import { Logger } from "../utils/logger";
-import { fileURLToPath } from "url";
-import { createPool } from "generic-pool";
-import { render, prepareRenderer, destroyRenderer } from "../render";
+import * as path from 'path';
+import * as fs from 'fs';
+import { BlockModel } from '../utils/types.js';
+import { Logger } from '../utils/logger.js';
+import { fileURLToPath } from 'url';
+import { createPool } from 'generic-pool';
+import { render, prepareRenderer, destroyRenderer } from '../render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,11 +28,11 @@ export class RenderTest extends Test({
       {
         create: async () => {
           return await prepareRenderer({
-            width: parseInt(process.env.WIDTH || "1000"),
-            height: parseInt(process.env.HEIGHT || "1000"),
-            distance: parseInt(process.env.DISTANCE || "20"),
-            plane: parseInt(process.env.PLANE || "0"),
-            animation: process.env.ANIMATION !== "false",
+            width: parseInt(process.env.WIDTH || '1000'),
+            height: parseInt(process.env.HEIGHT || '1000'),
+            distance: parseInt(process.env.DISTANCE || '20'),
+            plane: parseInt(process.env.PLANE || '0'),
+            animation: process.env.ANIMATION !== 'false',
           });
         },
         destroy: async (renderer) => {
@@ -41,7 +41,7 @@ export class RenderTest extends Test({
       },
       {
         max: 10,
-        min: 2,
+        min: 0,
       },
     );
 
@@ -70,7 +70,7 @@ export class RenderTest extends Test({
 
             const filePath = path.resolve(
               __dirname,
-              `../../test-data/${process.env.RENDER_FOLDER || ""}${result.blockName}.png`,
+              `../../test-data/${process.env.RENDER_FOLDER || ''}${result.blockName}.png`,
             );
 
             await writeAsync(filePath, result.buffer);
@@ -79,7 +79,7 @@ export class RenderTest extends Test({
               `${current}/${total} Rendering ${result.blockName} successfully`,
             );
           } catch (err: any) {
-            console.error("Error rendering block " + block.blockName, err);
+            console.error('Error rendering block ' + block.blockName, err);
           } finally {
             await pool.release(renderer);
           }
@@ -108,7 +108,7 @@ function pickBlocks(blocks: BlockModel[]) {
     return blocks;
   }
 
-  const preferred = BLOCK_NAMES.split(",");
+  const preferred = BLOCK_NAMES.split(',');
 
   Logger.info(() => `BLOCK_NAMES flag is enabled. "${BLOCK_NAMES}"`);
 

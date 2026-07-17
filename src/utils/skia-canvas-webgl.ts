@@ -1,4 +1,8 @@
-import { Canvas as SkiaCanvas, Image, loadImage as skiaLoadImage } from 'skia-canvas';
+import {
+  Canvas as SkiaCanvas,
+  Image,
+  loadImage as skiaLoadImage,
+} from 'skia-canvas';
 //@ts-ignore
 import createGLContext from 'gl';
 
@@ -70,13 +74,14 @@ export class WebGLCanvas extends SkiaCanvas {
       gl.texImage2D = function (...args: any[]) {
         let pixels = args[args.length - 1];
         if (pixels && pixels._image) pixels = pixels._image;
-        if (pixels && (
-          typeof pixels.getContext === 'function' ||
-          pixels.constructor?.name === 'Canvas' ||
-          pixels.constructor?.name === 'WebGLCanvas' ||
-          pixels.constructor?.name === 'Image' ||
-          pixels.constructor?.name === 'NodeCanvasElement'
-        )) {
+        if (
+          pixels &&
+          (typeof pixels.getContext === 'function' ||
+            pixels.constructor?.name === 'Canvas' ||
+            pixels.constructor?.name === 'WebGLCanvas' ||
+            pixels.constructor?.name === 'Image' ||
+            pixels.constructor?.name === 'NodeCanvasElement')
+        ) {
           let canvasToUse = pixels;
           if (pixels.constructor?.name === 'Image') {
             const tempCanvas = new SkiaCanvas(pixels.width, pixels.height);
@@ -86,15 +91,31 @@ export class WebGLCanvas extends SkiaCanvas {
           }
 
           const ctx2d = canvasToUse.getContext('2d');
-          const imageData = ctx2d.getImageData(0, 0, canvasToUse.width, canvasToUse.height);
-          
+          const imageData = ctx2d.getImageData(
+            0,
+            0,
+            canvasToUse.width,
+            canvasToUse.height,
+          );
+
           const target = args[0];
           const level = args[1];
           const internalformat = args[2];
           const format = args[3];
           const type = args[4];
-          
-          return _texImage2D.call(this, target, level, internalformat, canvasToUse.width, canvasToUse.height, 0, format, type, new Uint8Array(imageData.data));
+
+          return _texImage2D.call(
+            this,
+            target,
+            level,
+            internalformat,
+            canvasToUse.width,
+            canvasToUse.height,
+            0,
+            format,
+            type,
+            new Uint8Array(imageData.data),
+          );
         }
         return _texImage2D.apply(this, args);
       };

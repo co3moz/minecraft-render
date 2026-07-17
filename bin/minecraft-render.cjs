@@ -12,7 +12,12 @@ program
   .option('-w, --width [width]', 'output image width', 1000)
   .option('-t, --height [height]', 'output image height', 1000)
   .option('-d, --distance [distance]', 'distance between camera and block', 20)
-  .option('-v, --verbose', 'increases logging level', (v, p) => typeof v != 'undefined' ? v : (p + 1), Logger.categories.info)
+  .option(
+    '-v, --verbose',
+    'increases logging level',
+    (v, p) => (typeof v != 'undefined' ? v : p + 1),
+    Logger.categories.info,
+  )
   .option('-p, --plane', 'debugging plane and axis', 0)
   .option('-A, --no-animation', 'disables apng generation')
   .option('-f, --filter <regex>', 'regex pattern to filter blocks by name')
@@ -44,21 +49,25 @@ async function Main() {
     width: parseInt(options.width),
     distance: parseInt(options.distance),
     plane: options.plane,
-    animation: options.animation
+    animation: options.animation,
   };
 
   for await (const block of minecraft.render(blocks, rendererOptions)) {
     const j = (++i).toString().padStart(padSize, '0');
 
     if (!block.buffer) {
-      console.log(`[${j} / ${totalBlocks}] ${block.blockName} skipped due to "${block.skip}"`);
+      console.log(
+        `[${j} / ${totalBlocks}] ${block.blockName} skipped due to "${block.skip}"`,
+      );
       continue;
     }
 
     const filePath = path.join(folder, block.blockName + '.png');
     await fs.promises.writeFile(filePath, block.buffer);
 
-    console.log(`[${j} / ${totalBlocks}] ${block.blockName} rendered to ${filePath}`);
+    console.log(
+      `[${j} / ${totalBlocks}] ${block.blockName} rendered to ${filePath}`,
+    );
   }
 
   console.log(`Rendering completed! "${folder}"`);
@@ -69,7 +78,7 @@ function filterByRegex(pattern, array) {
 
   const regex = new RegExp(pattern);
 
-  return array.filter(block => regex.test(block.blockName));
+  return array.filter((block) => regex.test(block.blockName));
 }
 
-Main().catch(e => console.error('Rendering failed!', e));
+Main().catch((e) => console.error('Rendering failed!', e));

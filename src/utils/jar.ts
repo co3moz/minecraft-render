@@ -16,7 +16,6 @@ export class Jar {
     await this.zip.close();
   }
 
-
   async entries(path: string): Promise<ZipEntry[]> {
     return Object.entries(await this.zip.entries())
       .filter(([key]) => key.startsWith(path))
@@ -24,7 +23,7 @@ export class Jar {
   }
 
   read(path: string | ZipEntry) {
-    return this.zip.entryData(typeof path === "string" ? path : path.name);
+    return this.zip.entryData(typeof path === 'string' ? path : path.name);
   }
 
   async readJson(path: string | ZipEntry) {

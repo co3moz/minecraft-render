@@ -1,5 +1,5 @@
-import * as THREE from "three";
-import { Canvas as SkiaCanvas } from "skia-canvas";
+import * as THREE from 'three';
+import { Canvas as SkiaCanvas } from 'skia-canvas';
 import type {
   BlockModel,
   BlockSides,
@@ -7,24 +7,24 @@ import type {
   Face,
   Renderer,
   RendererOptions,
-} from "./utils/types";
-import type { Minecraft } from "./minecraft";
-import { distance, invert, mul, size } from "./utils/vector-math";
-import { Logger } from "./utils/logger";
+} from './utils/types.js';
+import type { Minecraft } from './minecraft.js';
+import { distance, invert, mul, size } from './utils/vector-math.js';
+import { Logger } from './utils/logger.js';
 import {
   createCanvas,
   loadImage,
   WebGLCanvas,
-} from "./utils/skia-canvas-webgl";
-import { makeAnimatedPNG } from "./utils/apng";
+} from './utils/skia-canvas-webgl.js';
+import { makeAnimatedPNG } from './utils/apng.js';
 
 const MATERIAL_FACE_ORDER = [
-  "east",
-  "west",
-  "up",
-  "down",
-  "south",
-  "north",
+  'east',
+  'west',
+  'up',
+  'down',
+  'south',
+  'north',
 ] as const;
 
 export async function prepareRenderer({
@@ -110,6 +110,7 @@ export async function prepareRenderer({
     renderer,
     canvas,
     camera,
+    light,
     textureCache: {},
     animatedCache: {},
     options: { width, height, distance, plane, animation },
@@ -122,7 +123,7 @@ export async function destroyRenderer(renderer: Renderer) {
   await new Promise((resolve) => setTimeout(resolve, 500));
   renderer.renderer.info.reset();
   (renderer.canvas as any).__gl__
-    .getExtension("STACKGL_destroy_context")
+    .getExtension('STACKGL_destroy_context')
     .destroy();
 
   Logger.debug(() => `Renderer destroyed`);
@@ -142,10 +143,10 @@ export async function render(
 
   if (!gui || !block.elements || !block.textures) {
     resultBlock.skip = !gui
-      ? "no gui"
+      ? 'no gui'
       : !block.elements
-        ? "no element"
-        : "no texture";
+        ? 'no element'
+        : 'no texture';
     return resultBlock;
   }
 
@@ -155,7 +156,7 @@ export async function render(
 
   Logger.trace(() => `Camera zoom = ${camera.zoom}`);
 
-  if (typeof block.animationCurrentTick == "undefined") {
+  if (typeof block.animationCurrentTick == 'undefined') {
     block.animationCurrentTick = 0;
   }
 
@@ -176,7 +177,7 @@ export async function render(
         element.calculatedSize = size(element.from!, element.to!);
 
         Logger.trace(
-          () => `Element[${i}] geometry = ${element.calculatedSize!.join(",")}`,
+          () => `Element[${i}] geometry = ${element.calculatedSize!.join(',')}`,
         );
 
         const geometry = new THREE.BoxGeometry(
@@ -203,7 +204,7 @@ export async function render(
 
         Logger.trace(
           () =>
-            `Element[${i}] position set to ${cube.position.toArray().join(",")}`,
+            `Element[${i}] position set to ${cube.position.toArray().join(',')}`,
         );
 
         if (element.rotation) {
@@ -212,13 +213,13 @@ export async function render(
             new THREE.Matrix4().makeTranslation(...invert(origin)),
           );
 
-          if (element.rotation.axis == "y") {
+          if (element.rotation.axis == 'y') {
             cube.applyMatrix4(
               new THREE.Matrix4().makeRotationY(
                 THREE.MathUtils.DEG2RAD * element.rotation.angle!,
               ),
             );
-          } else if (element.rotation.axis == "x") {
+          } else if (element.rotation.axis == 'x') {
             cube.applyMatrix4(
               new THREE.Matrix4().makeRotationX(
                 THREE.MathUtils.DEG2RAD * element.rotation.angle!,
@@ -238,30 +239,41 @@ export async function render(
         clean.push(cube);
       }
 
-      const rotation = new THREE.Vector3(...gui.rotation).add(
-        new THREE.Vector3(195, -90, -45),
-      );
-      camera.position.set(
-        ...(rotation
-          .toArray()
-          .map((x) => Math.sin(x * THREE.MathUtils.DEG2RAD) * 16) as [
-          number,
-          number,
-          number,
-        ]),
-      );
+      const stdX =
+        Math.sin((gui.rotation[0] + 195) * THREE.MathUtils.DEG2RAD) * 16;
+      const stdY =
+        Math.sin((gui.rotation[0] + 105) * THREE.MathUtils.DEG2RAD) * 16;
+      const stdZ =
+        Math.sin((gui.rotation[2] - 45) * THREE.MathUtils.DEG2RAD) * 16;
+
+      const yawDiff = (gui.rotation[1] - 135) * THREE.MathUtils.DEG2RAD;
+      const cosYaw = Math.cos(yawDiff);
+      const sinYaw = Math.sin(yawDiff);
+
+      const posX = stdX * cosYaw - stdZ * sinYaw;
+      const posY = stdY;
+      const posZ = stdX * sinYaw + stdZ * cosYaw;
+
+      camera.position.set(posX, posY, posZ);
       camera.lookAt(0, 0, 0);
       camera.position.add(new THREE.Vector3(...gui.translation));
       camera.updateMatrix();
       camera.updateProjectionMatrix();
 
       Logger.trace(
-        () => `Camera position set ${camera.position.toArray().join(",")}`,
+        () => `Camera position set ${camera.position.toArray().join(',')}`,
       );
+
+      if (block.gui_light === 'front') {
+        activeRenderer.light.position.copy(camera.position);
+      } else {
+        activeRenderer.light.position.set(15, 20, -7);
+      }
+      activeRenderer.light.updateMatrix();
 
       renderer.render(scene, camera);
 
-      const buffer = canvas.toBuffer("image/png");
+      const buffer = canvas.toBuffer('image/png');
       buffers.push(buffer);
 
       Logger.trace(
@@ -270,6 +282,7 @@ export async function render(
 
       for (const old of clean) {
         scene.remove(old);
+        old.geometry.dispose();
       }
       clean.length = 0;
 
@@ -291,8 +304,9 @@ export async function render(
   } catch (e: any) {
     for (const old of clean) {
       scene.remove(old);
+      old.geometry.dispose();
     }
-    resultBlock.skip = e.message || "error";
+    resultBlock.skip = e.message || 'error';
   }
 
   return resultBlock;
@@ -310,7 +324,7 @@ async function constructTextureMaterial(
   const cache = activeRenderer.textureCache;
   const animatedCache = activeRenderer.animatedCache;
 
-  const imageCacheKey = "image:" + path;
+  const imageCacheKey = 'image:' + path;
   const image = cache[imageCacheKey]
     ? cache[imageCacheKey]
     : (cache[imageCacheKey] = await loadImage(
@@ -344,13 +358,18 @@ async function constructTextureMaterial(
     }
   }
 
-  const materialCacheKey = `material:${path}_${face.rotation || 0}_${face.uv ? face.uv.join(",") : ""}_${frame}`;
+  // `shade: false` in the model means the face is rendered fullbright,
+  // unaffected by scene lighting (e.g. the campfire fire planes). Otherwise
+  // faces pointing away from the directional light render pitch black.
+  const shaded = element.shade !== false;
+
+  const materialCacheKey = `material:${path}_${face.rotation || 0}_${face.uv ? face.uv.join(',') : ''}_${frame}_${shaded ? 's' : 'u'}`;
   if (cache[materialCacheKey]) {
     return cache[materialCacheKey];
   }
 
   const canvas = new SkiaCanvas(width, height);
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext('2d');
 
   ctx.imageSmoothingEnabled = false;
 
@@ -385,15 +404,21 @@ async function constructTextureMaterial(
 
   Logger.trace(() => `Face[${direction}] texture is ready`);
 
-  const material = new THREE.MeshStandardMaterial({
-    map: texture,
-    color: 0xffffff,
-    transparent: true,
-    roughness: 1,
-    metalness: 0,
-    emissive: 1,
-    alphaTest: 0.1,
-  });
+  const material = shaded
+    ? new THREE.MeshStandardMaterial({
+        map: texture,
+        color: 0xffffff,
+        transparent: true,
+        roughness: 1,
+        metalness: 0,
+        alphaTest: 0.1,
+      })
+    : new THREE.MeshBasicMaterial({
+        map: texture,
+        color: 0xffffff,
+        transparent: true,
+        alphaTest: 0.1,
+      });
 
   cache[materialCacheKey] = material;
   return material;
@@ -461,8 +486,8 @@ async function decodeFace(
 }
 
 function decodeTexture(texture: any, block: BlockModel): string | null {
-  if (typeof texture !== "string") return null;
-  if (!texture.startsWith("#")) {
+  if (typeof texture !== 'string') return null;
+  if (!texture.startsWith('#')) {
     return texture;
   }
 

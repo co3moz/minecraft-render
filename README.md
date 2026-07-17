@@ -3,18 +3,14 @@
 minecraft-render
 =======================
 
-
-Renders minecraft block models from .jar file using `THREE.js`. 
+Renders minecraft block models from .jar file using `THREE.js`.
 Default output format is PNG `1000x1000`.
-
 
 ### Pre-rendered assets
 
 You can find pre-rendered assets on Github Actions artifacts. By clicking the badge down below, you can access action list.
 
 [![Render Test](https://github.com/co3moz/minecraft-render/actions/workflows/ci.yml/badge.svg)](https://github.com/co3moz/minecraft-render/actions/workflows/ci.yml)
-
-
 
 ### Binaries
 
@@ -51,14 +47,12 @@ npx minecraft-render minecraft-version.1.17.1.jar output-folder/
 
 Filtering and rendering options
 
-
 ```sh
 npx minecraft-render minecraft-version.1.17.1.jar --filter "soul_campfire" --no-animation --width 100 --height 100 output/ --verbose
 
 
 [1 / 1] soul_campfire rendered to output-folder\soul_campfire.png
 ```
-
 
 ### Using Rendering API
 
@@ -76,11 +70,13 @@ async function main() {
       continue;
     }
 
-    await fs.promises.writeFile(`./render/${block.blockName}.png`, block.buffer);
+    await fs.promises.writeFile(
+      `./render/${block.blockName}.png`,
+      block.buffer,
+    );
   }
 }
 ```
-
 
 ### Tests
 

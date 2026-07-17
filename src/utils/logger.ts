@@ -5,7 +5,7 @@ const CATEGORIES = {
   warn: 2,
   info: 3,
   debug: 4,
-  trace: 5
+  trace: 5,
 } as const;
 
 export class Logger {
@@ -43,7 +43,7 @@ export class Logger {
 }
 
 export interface LoggerCallback {
-  (): string
+  (): string;
 }
 
 function getLevelFromEnv(): number | undefined {

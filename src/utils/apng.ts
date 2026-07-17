@@ -5,7 +5,7 @@ function makeTable() {
   for (let i = 0; i < 256; i++) {
     let c = i;
     for (let j = 0; j < 8; j++) {
-      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
     }
     table[i] = c;
   }
@@ -60,8 +60,7 @@ export function makeAnimatedPNG(buffers: Buffer[], delay: DelayFn) {
       if (idat === null) {
         if (offset === 8) {
           throw new Error('No IDAT chunks found!');
-        }
-        else {
+        } else {
           break;
         }
       }
@@ -112,5 +111,5 @@ function findChunk(buffer: Buffer, type: string, offset = 8) {
 }
 
 export interface DelayFn {
-  (frameIndex: number): ({ numerator: number, denominator: number });
+  (frameIndex: number): { numerator: number; denominator: number };
 }

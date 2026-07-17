@@ -1,6 +1,6 @@
-import { Test } from "nole";
-import { Jar } from "../utils/jar";
-import { DownloadTest } from "./download.test";
+import { Test } from 'nole';
+import { Jar } from '../utils/jar.js';
+import { DownloadTest } from './download.test.js';
 
 export class JarTest extends Test({
   dependencies: {
@@ -14,7 +14,7 @@ export class JarTest extends Test({
   }
 
   async entries() {
-    await this.jar.entries("assets");
+    await this.jar.entries('assets');
   }
 
   async cleanUp() {
