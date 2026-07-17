@@ -1,31 +1,93 @@
-import { Dependency, Skip, Spec } from 'nole';
-import { MinecraftTest } from './minecraft.test';
+import { Test } from "nole";
+import { MinecraftTest } from "./minecraft.test";
 
-import * as path from 'path';
-import * as fs from 'fs';
-import { BlockModel } from '../utils/types';
-import { Logger } from '../utils/logger';
+import * as path from "path";
+import * as fs from "fs";
+import { BlockModel } from "../utils/types";
+import { Logger } from "../utils/logger";
+import { fileURLToPath } from "url";
+import { createPool } from "generic-pool";
+import { render, prepareRenderer, destroyRenderer } from "../render";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export class RenderTest {
-  @Dependency(MinecraftTest)
+export class RenderTest extends Test({
+  timeout: 600000,
+  dependencies: {
+    minecraftTest: () => MinecraftTest,
+  },
+}) {
   minecraftTest!: MinecraftTest;
 
-  @Spec(180000)
   async renderAll() {
     const blocks = await this.minecraftTest.minecraft.getBlockList();
 
     const renderCandidates = pickBlocks(blocks);
 
-    for await (const render of this.minecraftTest.minecraft.render(renderCandidates)) {
-      if (!render.buffer) {
-        console.log('Rendering skipped ' + render.blockName + ' reason: ' + render.skip!);
-        continue;
-      }
+    const pool = createPool(
+      {
+        create: async () => {
+          return await prepareRenderer({
+            width: parseInt(process.env.WIDTH || "1000"),
+            height: parseInt(process.env.HEIGHT || "1000"),
+            distance: parseInt(process.env.DISTANCE || "20"),
+            plane: parseInt(process.env.PLANE || "0"),
+            animation: process.env.ANIMATION !== "false",
+          });
+        },
+        destroy: async (renderer) => {
+          await destroyRenderer(renderer);
+        },
+      },
+      {
+        max: 10,
+        min: 2,
+      },
+    );
 
-      const filePath = path.resolve(__dirname, `../../test-data/${process.env.RENDER_FOLDER || ''}${render.blockName}.png`);
+    const total = renderCandidates.length;
+    let current = 0;
 
-      await writeAsync(filePath, render.buffer);
+    try {
+      await Promise.all(
+        renderCandidates.map(async (block) => {
+          const renderer = await pool.acquire();
+
+          try {
+            current++;
+            const result = await render(
+              this.minecraftTest.minecraft,
+              block,
+              renderer,
+            );
+
+            if (!result.buffer) {
+              console.log(
+                `${current}/${total} Rendering skipped ${result.blockName} reason: ${result.skip!}`,
+              );
+              return;
+            }
+
+            const filePath = path.resolve(
+              __dirname,
+              `../../test-data/${process.env.RENDER_FOLDER || ""}${result.blockName}.png`,
+            );
+
+            await writeAsync(filePath, result.buffer);
+
+            console.log(
+              `${current}/${total} Rendering ${result.blockName} successfully`,
+            );
+          } catch (err: any) {
+            console.error("Error rendering block " + block.blockName, err);
+          } finally {
+            await pool.release(renderer);
+          }
+        }),
+      );
+    } finally {
+      await pool.drain();
+      await pool.clear();
     }
   }
 }
@@ -46,9 +108,11 @@ function pickBlocks(blocks: BlockModel[]) {
     return blocks;
   }
 
-  const preferred = BLOCK_NAMES.split(',');
+  const preferred = BLOCK_NAMES.split(",");
 
-  Logger.info(() => `BLOCK_NAMES flag is enabled. "${BLOCK_NAMES}"`)
+  Logger.info(() => `BLOCK_NAMES flag is enabled. "${BLOCK_NAMES}"`);
 
-  return blocks.filter(block => preferred.some(name => name == block.blockName));
+  return blocks.filter((block) =>
+    preferred.some((name) => name == block.blockName),
+  );
 }

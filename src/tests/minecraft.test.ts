@@ -1,20 +1,19 @@
-import { Dependency, Spec } from 'nole';
-import { Minecraft } from '../minecraft';
-import { JarTest } from './jar.test';
+import { Test } from "nole";
+import { Minecraft } from "../minecraft";
+import { JarTest } from "./jar.test";
 
-export class MinecraftTest {
-  @Dependency(JarTest)
-  jarTest!: JarTest;
+export class MinecraftTest extends Test({
+  dependencies: {
+    jarTest: () => JarTest,
+  },
+}) {
+  minecraft!: Minecraft;
 
-  minecraft!: Minecraft
-
-  @Spec()
   async init() {
     this.minecraft = Minecraft.open(this.jarTest.jar);
   }
 
-  @Spec()
   async blockModel() {
-    (await this.minecraft.getModelFile());
+    await this.minecraft.getModelFile();
   }
 }

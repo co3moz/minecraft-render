@@ -1,35 +1,35 @@
-import { Spec, skipTest } from "nole";
+import { Test, skipTest } from "nole";
 import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
-export class DownloadTest {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export class DownloadTest extends Test({ timeout: 120000 }) {
   private targetVersionUrl: string = '';
   private jarUrl: string = '';
   public jarPath: string = '';
 
-  @Spec()
   async getManifest() {
-    this.checkExistingJar();
+    checkExistingJar(this);
     const response = await fetch(`https://launchermeta.mojang.com/mc/game/version_manifest.json`)
     const manifest: VersionManifest = await response.json();
     this.targetVersionUrl = manifest.versions.find(version => version.type == 'release' || version.id == manifest.latest.release)!.url;
   }
 
-  @Spec()
   async getVersionJarUrl() {
-    this.checkExistingJar();
+    checkExistingJar(this);
     const response = await fetch(this.targetVersionUrl)
     const version: Version = await response.json();
     this.jarUrl = version.downloads.client.url;
   }
 
-  @Spec(120000)
   async downloadJar() {
-    this.checkExistingJar();
+    checkExistingJar(this);
     const response = await fetch(this.jarUrl);
 
-    this.jarPath = this.getPath();
+    this.jarPath = getPath();
 
     const stream = fs.createWriteStream(this.jarPath);
 
@@ -39,19 +39,19 @@ export class DownloadTest {
       stream.on('close', resolve);
     });
   }
+}
 
-  checkExistingJar(): void | never {
-    if (this.jarPath) skipTest('Jar already exists');
-    const checkPath = this.getPath();
-    if (fs.existsSync(checkPath)) {
-      this.jarPath = checkPath;
-      skipTest('Jar already exists');
-    }
+function checkExistingJar(instance: DownloadTest): void | never {
+  if (instance.jarPath) skipTest('Jar already exists');
+  const checkPath = getPath();
+  if (fs.existsSync(checkPath)) {
+    instance.jarPath = checkPath;
+    skipTest('Jar already exists');
   }
+}
 
-  getPath() {
-    return path.resolve(__dirname, '../../test-data/test.jar');
-  }
+function getPath() {
+  return path.resolve(__dirname, '../../test-data/test.jar');
 }
 
 interface VersionManifest {

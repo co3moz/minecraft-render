@@ -46,6 +46,10 @@ export interface LoggerCallback {
   (): string
 }
 
-function getLevelFromEnv() {
-  return (process.env.LOGGER_LEVEL && CATEGORIES[process.env.LOGGER_LEVEL as keyof typeof CATEGORIES]);
+function getLevelFromEnv(): number | undefined {
+  const envVal = process.env.LOGGER_LEVEL;
+  if (envVal && envVal in CATEGORIES) {
+    return CATEGORIES[envVal as keyof typeof CATEGORIES];
+  }
+  return undefined;
 }

@@ -2,7 +2,7 @@ import { destroyRenderer, prepareRenderer, render } from "./render";
 import { Jar } from "./utils/jar";
 import type { AnimationMeta, BlockModel, Renderer, RendererOptions } from "./utils/types";
 //@ts-ignore
-import * as deepAssign from 'assign-deep';
+import deepAssign from 'assign-deep';
 
 export class Minecraft {
   protected jar: Jar

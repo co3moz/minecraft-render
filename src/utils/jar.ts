@@ -1,10 +1,11 @@
-import { async, ZipEntry } from 'node-stream-zip';
+import StreamZip from 'node-stream-zip';
+import type { ZipEntry } from 'node-stream-zip';
 
 export class Jar {
-  protected zip: InstanceType<typeof async>;
+  protected zip: any;
 
   protected constructor(public file: string) {
-    this.zip = new async({ file });
+    this.zip = new StreamZip.async({ file });
   }
 
   static open(file: string) {
@@ -19,7 +20,7 @@ export class Jar {
   async entries(path: string): Promise<ZipEntry[]> {
     return Object.entries(await this.zip.entries())
       .filter(([key]) => key.startsWith(path))
-      .map(([_, value]) => value);
+      .map(([_, value]) => value as ZipEntry);
   }
 
   read(path: string | ZipEntry) {
