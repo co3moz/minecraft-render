@@ -5,18 +5,18 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-      - run: npm install
-      - run: sudo apt-get install xvfb
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
       - run: xvfb-run --auto-servernum npm test
       - name: Archive production artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-result
           path: |
