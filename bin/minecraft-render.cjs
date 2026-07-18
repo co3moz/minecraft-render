@@ -27,6 +27,15 @@ program
     (value, previous) => previous.concat([value]),
     [],
   )
+  .option(
+    '--auto-vanilla',
+    "detect the mod's required Minecraft version and download that vanilla jar if missing",
+  )
+  .option(
+    '--cache-dir <dir>',
+    'directory to cache downloaded vanilla jars',
+    '.',
+  )
   .version(package.version)
   .parse(process.argv);
 
@@ -39,10 +48,20 @@ if (!program.args.length) {
 async function Main() {
   Logger.level = options.verbose;
 
-  const jars = [program.args[0], ...options.merge].map((jar) =>
-    path.resolve(jar),
-  );
-  const minecraft = Minecraft.open(jars);
+  const primary = path.resolve(program.args[0]);
+  const merge = options.merge.map((jar) => path.resolve(jar));
+
+  let minecraft;
+  if (options.autoVanilla) {
+    minecraft = await Minecraft.forMod(primary, {
+      cacheDir: path.resolve(options.cacheDir),
+      minecraftJar: merge[0],
+      onProgress: (message) => console.log(message),
+    });
+  } else {
+    minecraft = Minecraft.open([primary, ...merge]);
+  }
+
   const blocks = filterByRegex(options.filter, await minecraft.getBlockList());
 
   let i = 0;
@@ -61,10 +80,17 @@ async function Main() {
     animation: options.animation,
   };
 
+  const missingJars = new Map();
+
   for await (const block of minecraft.render(blocks, rendererOptions)) {
     const j = (++i).toString().padStart(padSize, '0');
 
     if (!block.buffer) {
+      const match = /Namespace "([^"]+)" is not loaded.*--merge ([^\s`]+)/.exec(
+        block.skip || '',
+      );
+      if (match) missingJars.set(match[1], match[2]);
+
       console.log(
         `[${j} / ${totalBlocks}] ${block.blockName} skipped due to "${block.skip}"`,
       );
@@ -80,6 +106,20 @@ async function Main() {
   }
 
   console.log(`Rendering completed! "${folder}"`);
+
+  if (missingJars.size) {
+    const suggestions = [...missingJars.values()];
+    console.log(
+      `\n⚠ ${missingJars.size} referenced jar(s) were not loaded: ${[
+        ...missingJars.keys(),
+      ].join(', ')}`,
+    );
+    console.log(
+      `Add them and re-run:\n  minecraft-render ${program.args[0]} ${
+        program.args[1] || 'output'
+      } ${suggestions.map((s) => `--merge ${s}`).join(' ')}`,
+    );
+  }
 }
 
 function filterByRegex(pattern, array) {

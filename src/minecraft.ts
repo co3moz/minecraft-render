@@ -1,9 +1,16 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { destroyRenderer, prepareRenderer, render } from './render.js';
 import { Jar } from './utils/jar.js';
 import {
   renderPool,
   type ParallelRenderResult,
 } from './utils/render-pool.js';
+import { inspectJar, type JarInfo } from './utils/mod-info.js';
+import {
+  downloadMinecraftJar,
+  resolveMinecraftVersion,
+} from './utils/vanilla-download.js';
 import type {
   AnimationMeta,
   BlockModel,
@@ -13,6 +20,17 @@ import type {
 //@ts-ignore
 import deepAssign from 'assign-deep';
 
+export interface ForModOptions {
+  /** Directory to cache downloaded vanilla jars in. Defaults to the cwd. */
+  cacheDir?: string;
+  /** Explicit vanilla jar to use instead of resolving/downloading one. */
+  minecraftJar?: string;
+  /** Set false to never download; throws if the vanilla jar is missing. */
+  download?: boolean;
+  /** Called with progress notes (version resolution, download start). */
+  onProgress?: (message: string) => void;
+}
+
 export type MinecraftSource = string | Jar;
 
 export class Minecraft {
@@ -20,6 +38,8 @@ export class Minecraft {
   protected renderer!: Renderer | null;
   protected _cache: { [key: string]: any } = {};
   protected _namespace: string | null = null;
+  protected _namespaces: Set<string> | null = null;
+  protected _dependencies: Record<string, string> | null = null;
 
   protected constructor(source: MinecraftSource | MinecraftSource[]) {
     const sources = Array.isArray(source) ? source : [source];
@@ -37,6 +57,59 @@ export class Minecraft {
    */
   static open(source: MinecraftSource | MinecraftSource[]) {
     return new Minecraft(source);
+  }
+
+  /**
+   * Opens a mod jar together with the vanilla jar it depends on. Inspects the
+   * mod's loader manifest for its required Minecraft version and, unless an
+   * explicit `minecraftJar` is given, resolves that version against Mojang's
+   * manifest and downloads it into `cacheDir` if it isn't already there.
+   */
+  static async forMod(
+    modSource: MinecraftSource,
+    options: ForModOptions = {},
+  ): Promise<Minecraft> {
+    const { cacheDir = process.cwd(), download = true, onProgress } = options;
+    const note = (message: string) => onProgress?.(message);
+
+    const modJar = modSource instanceof Jar ? modSource : Jar.open(modSource);
+    const info: JarInfo = await inspectJar(modJar);
+    const sources: MinecraftSource[] = [modJar];
+
+    let minecraftJar = options.minecraftJar;
+
+    if (!minecraftJar && info.loader !== 'vanilla' && info.minecraft) {
+      note(`Mod requires Minecraft "${info.minecraft}"; resolving…`);
+      const version = await resolveMinecraftVersion(info.minecraft);
+      if (!version) {
+        throw new Error(
+          `Could not resolve Minecraft version "${info.minecraft}" from the ` +
+            `Mojang manifest. Pass \`minecraftJar\` explicitly.`,
+        );
+      }
+
+      minecraftJar = path.resolve(cacheDir, `minecraft-${version.id}.jar`);
+      if (!fs.existsSync(minecraftJar)) {
+        if (!download) {
+          throw new Error(
+            `Minecraft ${version.id} jar not found at ${minecraftJar} and ` +
+              `download is disabled.`,
+          );
+        }
+        note(`Downloading Minecraft ${version.id}…`);
+        await fs.promises.mkdir(cacheDir, { recursive: true });
+        await downloadMinecraftJar(version, minecraftJar);
+      }
+    }
+
+    if (minecraftJar) sources.push(minecraftJar);
+
+    return new Minecraft(sources);
+  }
+
+  /** Identifies this jar's loader and Minecraft-version requirement. */
+  inspect(): Promise<JarInfo> {
+    return inspectJar(this.jars[0]);
   }
 
   /** File path of the first (primary) jar. */
@@ -97,7 +170,7 @@ export class Minecraft {
 
       return this._cache[path];
     } catch (e) {
-      throw new Error(`Unable to find model file: ${path}`);
+      throw new Error(await this.missingAssetMessage(name, `model ${path}`));
     }
   }
 
@@ -107,8 +180,55 @@ export class Minecraft {
     try {
       return await this.read(path);
     } catch (e) {
-      throw new Error(`Unable to find texture file: ${path}`);
+      throw new Error(await this.missingAssetMessage(name, `texture ${path}`));
     }
+  }
+
+  /** The set of asset namespaces present across all loaded jars. */
+  async loadedNamespaces(): Promise<Set<string>> {
+    if (this._namespaces) return this._namespaces;
+
+    const set = new Set<string>();
+    for (const jar of this.jars) {
+      for (const entry of await jar.entries('assets/')) {
+        const match = /^assets\/([^/]+)\//.exec(entry.name);
+        if (match) set.add(match[1]);
+      }
+    }
+
+    return (this._namespaces = set);
+  }
+
+  /** The primary jar's declared dependency ranges (mod id → version range). */
+  protected async dependencies(): Promise<Record<string, string>> {
+    if (this._dependencies) return this._dependencies;
+    const info = await inspectJar(this.jars[0]);
+    return (this._dependencies = info.dependencies ?? {});
+  }
+
+  // Builds an actionable error when an asset can't be resolved. If its namespace
+  // isn't loaded at all, the reference belongs to another mod — suggest the jar
+  // to add (with the version the mod declares, if any) rather than a bare path.
+  protected async missingAssetMessage(
+    ref: string,
+    label: string,
+  ): Promise<string> {
+    const colon = ref.indexOf(':');
+    const namespace = colon === -1 ? 'minecraft' : ref.slice(0, colon);
+
+    if ((await this.loadedNamespaces()).has(namespace)) {
+      return `Unable to find ${label}`;
+    }
+
+    const range = (await this.dependencies())[namespace];
+    const version = range?.match(/\d[\w.-]*/)?.[0];
+    const suggestion = version ? `${namespace}.${version}.jar` : `${namespace}.jar`;
+    const declared = range ? ` (this mod depends on "${namespace}" ${range})` : '';
+
+    return (
+      `Namespace "${namespace}" is not loaded${declared}; ` +
+      `"${ref}" cannot be resolved. Add its jar with \`--merge ${suggestion}\`.`
+    );
   }
 
   async getTextureMetadata(name: string = ''): Promise<AnimationMeta | null> {
