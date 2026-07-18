@@ -1,5 +1,5 @@
 import { Minecraft } from './minecraft.js';
-import { prepareRenderer, render, destroyRenderer } from './render.js';
+import { prepareRenderer, render } from './render.js';
 import type { Renderer, RendererOptions } from './utils/types.js';
 
 // Entry point for a render worker process spawned by `renderPool`. headless-gl's
@@ -17,13 +17,11 @@ const getRenderer = () => (rendererPromise ??= prepareRenderer(options));
 
 process.on('message', async (msg: { name: string } | { close: true }) => {
   if ('close' in msg) {
-    // Recycled or finished: the process is about to exit (which is what frees
-    // headless-gl's native memory), so tear the context down immediately
-    // without the settle delay.
-    if (rendererPromise) await destroyRenderer(await rendererPromise, true);
-    await minecraft.close();
-    process.disconnect();
-    return;
+    // Recycled or finished. Exit the process outright — this is the only thing
+    // that returns headless-gl's native memory to the OS. `process.disconnect()`
+    // just closes the IPC channel and can leave the process alive on native
+    // handles, so exit hard; the OS reclaims the GL context, jar fds and all.
+    process.exit(0);
   }
 
   const { name } = msg;

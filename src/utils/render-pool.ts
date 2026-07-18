@@ -44,7 +44,7 @@ export async function* renderPool(
   // renders thousands of blocks grows without bound. Retire a worker after
   // `recycleEvery` blocks and spawn a fresh one to take over — process exit is
   // the only thing that fully reclaims the memory.
-  const recycleEvery = Number(process.env.RECYCLE_EVERY) || 256;
+  const recycleEvery = Number(process.env.RECYCLE_EVERY) || 50;
 
   const pending: ParallelRenderResult[] = [];
   const live = new Set<ChildProcess>();
