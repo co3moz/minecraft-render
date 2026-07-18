@@ -4,7 +4,11 @@ on: [push]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned to 22.04 (GCC 11): `gl` (headless-gl) v6 bundles an old ANGLE that
+    # fails to compile on ubuntu-24.04's GCC 13+ (missing <cstdint> for
+    # uintptr_t). There is no prebuilt binary for this Node version, so it is
+    # always built from source.
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -12,9 +16,8 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      # `gl` (headless-gl) has no prebuilt binary for this Node version and
-      # falls back to building from source, which needs X11 + Mesa GL/GLEW
-      # headers. These must be installed before `npm ci` runs gl's build script.
+      # gl builds from source and needs X11 + Mesa GL/GLEW headers; install
+      # them before `npm ci` runs gl's build script.
       - name: Install headless-gl build dependencies
         run: |
           sudo apt-get update
