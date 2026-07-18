@@ -12,8 +12,18 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+      # `gl` (headless-gl) has no prebuilt binary for this Node version and
+      # falls back to building from source, which needs X11 + Mesa GL/GLEW
+      # headers. These must be installed before `npm ci` runs gl's build script.
+      - name: Install headless-gl build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config \
+            libx11-dev libxi-dev libxext-dev \
+            libgl1-mesa-dev libglu1-mesa-dev libglew-dev \
+            xvfb
       - run: npm ci
-      - run: sudo apt-get update && sudo apt-get install -y xvfb
       - run: xvfb-run --auto-servernum npm test
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
