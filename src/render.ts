@@ -173,8 +173,7 @@ export async function render(
     block as any;
 
   const rawGui =
-    block.display?.gui ??
-    (options.renderWithoutGui ? DEFAULT_GUI : undefined);
+    block.display?.gui ?? (options.renderWithoutGui ? DEFAULT_GUI : undefined);
 
   if (!rawGui || !block.elements || !block.textures) {
     resultBlock.skip = !rawGui

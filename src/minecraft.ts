@@ -2,10 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { destroyRenderer, prepareRenderer, render } from './render.js';
 import { Jar } from './utils/jar.js';
-import {
-  renderPool,
-  type ParallelRenderResult,
-} from './utils/render-pool.js';
+import { renderPool, type ParallelRenderResult } from './utils/render-pool.js';
 import { inspectJar, type JarInfo } from './utils/mod-info.js';
 import {
   downloadMinecraftJar,
@@ -222,8 +219,12 @@ export class Minecraft {
 
     const range = (await this.dependencies())[namespace];
     const version = range?.match(/\d[\w.-]*/)?.[0];
-    const suggestion = version ? `${namespace}.${version}.jar` : `${namespace}.jar`;
-    const declared = range ? ` (this mod depends on "${namespace}" ${range})` : '';
+    const suggestion = version
+      ? `${namespace}.${version}.jar`
+      : `${namespace}.jar`;
+    const declared = range
+      ? ` (this mod depends on "${namespace}" ${range})`
+      : '';
 
     return (
       `Namespace "${namespace}" is not loaded${declared}; ` +

@@ -15,6 +15,8 @@ You can find pre-rendered assets on Github Actions artifacts. By clicking the ba
 
 ### Binaries
 
+> Please ensure Node.js version 22 or above is installed to run the binaries.
+
 Basic usage;
 
 ```sh
@@ -84,7 +86,9 @@ async function main() {
 
 ### Mod support
 
-Mod jars work alongside vanilla. Assets are resolved by **namespace**
+[![Rendered image - from create mod](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/experience_block.png)](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/experience_block.png)
+
+Mod jars work alongside vanilla jars. Assets are resolved by **namespace**
 (`minecraft:`, `travelersbackpack:`, …) instead of assuming `minecraft`, and the
 mod's namespace is auto-detected from the jar.
 
@@ -146,10 +150,10 @@ worker is **recycled** — its process is restarted — every `RECYCLE_EVERY` bl
 only thing that reclaims it; recycling keeps memory and per-block time flat over
 long runs.
 
-| Parameter | Where | Default | Purpose |
-| --- | --- | --- | --- |
-| `concurrency` | `renderParallel(names, { concurrency })` | CPU cores − 1 | number of worker processes |
-| `RECYCLE_EVERY` | environment variable | 50 | blocks a worker renders before it is retired and respawned |
+| Parameter       | Where                                    | Default       | Purpose                                                    |
+| --------------- | ---------------------------------------- | ------------- | ---------------------------------------------------------- |
+| `concurrency`   | `renderParallel(names, { concurrency })` | CPU cores − 1 | number of worker processes                                 |
+| `RECYCLE_EVERY` | environment variable                     | 50            | blocks a worker renders before it is retired and respawned |
 
 ### Tests
 
