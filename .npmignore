@@ -1,0 +1,5 @@
+src
+test-data
+*.jar
+.vscode
+.github
