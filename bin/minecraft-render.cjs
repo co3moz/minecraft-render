@@ -37,6 +37,10 @@ program
     'directory to cache downloaded vanilla jars',
     '.',
   )
+  .option(
+    '--render-without-gui',
+    'render blocks that have no gui transform (using the default) instead of skipping them',
+  )
   .version(package.version)
   .parse(process.argv);
 
@@ -79,6 +83,7 @@ async function Main() {
     distance: parseInt(options.distance),
     plane: options.plane,
     animation: options.animation,
+    renderWithoutGui: options.renderWithoutGui,
   };
 
   const missingJars = new Map();

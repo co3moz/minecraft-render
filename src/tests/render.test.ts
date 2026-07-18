@@ -30,6 +30,7 @@ export class RenderTest extends Test({
       concurrency: process.env.WORKERS
         ? parseInt(process.env.WORKERS)
         : undefined,
+      renderWithoutGui: process.env.RENDER_WITHOUT_GUI === 'true',
     };
 
     const total = names.length;

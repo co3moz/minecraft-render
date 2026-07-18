@@ -103,4 +103,9 @@ export interface RendererOptions {
   animation?: boolean;
   /** Worker processes for `Minecraft.renderParallel`; defaults to cores - 1. */
   concurrency?: number;
+  /**
+   * Render blocks that have no `display.gui` transform using the default
+   * inventory transform instead of skipping them with reason `no gui`.
+   */
+  renderWithoutGui?: boolean;
 }

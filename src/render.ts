@@ -7,6 +7,7 @@ import type {
   Face,
   Renderer,
   RendererOptions,
+  Transform,
   Vector,
 } from './utils/types.js';
 import type { Minecraft } from './minecraft.js';
@@ -28,12 +29,21 @@ const MATERIAL_FACE_ORDER = [
   'north',
 ] as const;
 
+// Vanilla `block/block` inventory transform, used as a fallback for models that
+// declare no `display.gui` when `renderWithoutGui` is enabled.
+const DEFAULT_GUI: Transform = {
+  rotation: [30, 225, 0],
+  translation: [0, 0, 0],
+  scale: [0.625, 0.625, 0.625],
+};
+
 export async function prepareRenderer({
   width = 1000,
   height = 1000,
   distance = 20,
   plane = 0,
   animation = true,
+  renderWithoutGui = false,
 }: RendererOptions): Promise<Renderer> {
   const scene = new THREE.Scene();
 
@@ -44,12 +54,19 @@ export async function prepareRenderer({
       `prepareRenderer(width=${width}, height=${height}, distance=${distance})`,
   );
 
+  // three.js r152+ turns colour management on by default (linear lighting +
+  // sRGB output), which shifts the flat, pass-through colours this renderer
+  // relied on and washes textures out. Restore the legacy pipeline so output
+  // matches the pre-upgrade look.
+  THREE.ColorManagement.enabled = false;
+
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
     alpha: true,
     logarithmicDepthBuffer: true,
   });
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
   Logger.trace(() => `WebGL initialized`);
 
@@ -65,7 +82,10 @@ export async function prepareRenderer({
     20000,
   );
 
-  const light = new THREE.DirectionalLight(0xffffff, 1.0);
+  // r155 made physically-correct lighting the default; the legacy model was ~PI
+  // brighter for direct/ambient lights. Scale the tuned intensities by PI so the
+  // look matches the pre-upgrade output without the deprecated `useLegacyLights`.
+  const light = new THREE.DirectionalLight(0xffffff, Math.PI);
   light.position.set(-15, 30, -25); // cube directions x => negative:bottom right, y => positive:top, z => negative:bottom left
   scene.add(light);
 
@@ -73,7 +93,7 @@ export async function prepareRenderer({
   // rendered pitch black. Minecraft shades faces with a fixed per-side factor
   // (never below ~0.5), so recessed/back-facing detail (e.g. the anvil neck)
   // stays visible instead of collapsing into a black void.
-  const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.3 * Math.PI);
   scene.add(ambient);
 
   Logger.trace(() => `Light added to scene`);
@@ -121,7 +141,7 @@ export async function prepareRenderer({
     light,
     textureCache: {},
     animatedCache: {},
-    options: { width, height, distance, plane, animation },
+    options: { width, height, distance, plane, animation, renderWithoutGui },
   };
 }
 
@@ -152,7 +172,9 @@ export async function render(
   const resultBlock: BlockModel & { buffer: Buffer; skip?: string } =
     block as any;
 
-  const gui = block.display?.gui;
+  const gui =
+    block.display?.gui ??
+    (options.renderWithoutGui ? DEFAULT_GUI : undefined);
 
   if (!gui || !block.elements || !block.textures) {
     resultBlock.skip = !gui
