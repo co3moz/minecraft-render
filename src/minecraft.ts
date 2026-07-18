@@ -263,7 +263,16 @@ export class Minecraft {
       await this.prepareRenderEnvironment(options);
 
       for (const block of blocks) {
-        yield await render(this, block);
+        try {
+          yield await render(this, block);
+        } catch (err: any) {
+          // A single malformed model must not abort the whole batch; surface it
+          // as a skipped block instead (the worker path already isolates these).
+          yield { ...block, skip: err?.message || 'error' } as BlockModel & {
+            buffer: Buffer;
+            skip?: string;
+          };
+        }
       }
     } finally {
       await this.cleanupRenderEnvironment();

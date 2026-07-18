@@ -172,18 +172,27 @@ export async function render(
   const resultBlock: BlockModel & { buffer: Buffer; skip?: string } =
     block as any;
 
-  const gui =
+  const rawGui =
     block.display?.gui ??
     (options.renderWithoutGui ? DEFAULT_GUI : undefined);
 
-  if (!gui || !block.elements || !block.textures) {
-    resultBlock.skip = !gui
+  if (!rawGui || !block.elements || !block.textures) {
+    resultBlock.skip = !rawGui
       ? 'no gui'
       : !block.elements
         ? 'no element'
         : 'no texture';
     return resultBlock;
   }
+
+  // A model may declare a partial gui transform (only rotation, say). Missing
+  // fields fall back to Minecraft's identity defaults; otherwise the camera
+  // maths below crash on an undefined rotation/translation/scale.
+  const gui: Transform = {
+    rotation: rawGui.rotation ?? ([0, 0, 0] as Vector),
+    translation: rawGui.translation ?? ([0, 0, 0] as Vector),
+    scale: rawGui.scale ?? ([1, 1, 1] as Vector),
+  };
 
   Logger.trace(() => `Started rendering ${resultBlock.blockName}`);
 
