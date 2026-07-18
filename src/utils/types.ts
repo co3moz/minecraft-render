@@ -39,6 +39,8 @@ export interface BlockModel {
   animationCurrentTick?: number;
 
   parent?: string;
+  /** UV coordinate space the model's faces are authored in; defaults to [16, 16]. */
+  texture_size?: readonly [number, number];
   textures?: {
     [key in BlockSides]?: string;
   };

@@ -367,7 +367,14 @@ async function constructTextureMaterial(
   // faces pointing away from the directional light render pitch black.
   const shaded = element.shade !== false;
 
-  const materialCacheKey = `material:${path}_${face.rotation || 0}_${face.uv ? face.uv.join(',') : ''}_${frame}_${shaded ? 's' : 'u'}`;
+  // UVs are authored relative to `texture_size` (default 16), which may differ
+  // from the texture's real pixel size — common in mod/Blockbench models with
+  // higher-res atlases. Scale UV → source pixels by (imageSize / textureSize).
+  const [texW, texH] = block.texture_size ?? [16, 16];
+  const scaleX = width / texW;
+  const scaleY = height / texH;
+
+  const materialCacheKey = `material:${path}_${face.rotation || 0}_${face.uv ? face.uv.join(',') : ''}_${frame}_${shaded ? 's' : 'u'}_${texW}x${texH}`;
   if (cache[materialCacheKey]) {
     return cache[materialCacheKey];
   }
@@ -404,10 +411,10 @@ async function constructTextureMaterial(
 
   ctx.drawImage(
     image,
-    Math.min(uv[0], uv[2]),
-    Math.min(uv[1], uv[3]) + frame * height,
-    Math.abs(uv[2] - uv[0]),
-    Math.abs(uv[3] - uv[1]),
+    Math.min(uv[0], uv[2]) * scaleX,
+    Math.min(uv[1], uv[3]) * scaleY + frame * height,
+    Math.abs(uv[2] - uv[0]) * scaleX,
+    Math.abs(uv[3] - uv[1]) * scaleY,
     0,
     0,
     width,
