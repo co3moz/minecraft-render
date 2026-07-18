@@ -3,8 +3,9 @@
 minecraft-render
 =======================
 
-Renders minecraft block models from .jar file using `THREE.js`.
-Default output format is PNG `1000x1000`.
+Renders minecraft block models from a .jar file using `THREE.js`.
+Default output format is PNG `1000x1000`. Vanilla and **mod** jars are supported,
+and rendering can be **parallelized** across worker processes.
 
 ### Pre-rendered assets
 
@@ -30,6 +31,9 @@ Options:
   -p, --plane                debugging plane and axis (default: 0)
   -A, --no-animation         disables apng generation
   -f, --filter <regex>       regex pattern to filter blocks by name
+  -m, --merge <jar>          extra fallback jar (e.g. the vanilla client jar) for mod assets; repeatable
+  --auto-vanilla             detect the mod's required Minecraft version and download that vanilla jar if missing
+  --cache-dir <dir>          directory to cache downloaded vanilla jars (default: .)
   -V, --version              output the version number
   -h, --help                 display help for command
 ```
@@ -78,6 +82,75 @@ async function main() {
 }
 ```
 
+### Mod support
+
+Mod jars work alongside vanilla. Assets are resolved by **namespace**
+(`minecraft:`, `travelersbackpack:`, …) instead of assuming `minecraft`, and the
+mod's namespace is auto-detected from the jar.
+
+Mod models usually reference vanilla assets (`minecraft:block/…`), so a mod jar
+alone is not enough — the matching vanilla jar is used as a fallback. Provide it
+yourself, or let minecraft-render resolve and download it:
+
+```sh
+# manual: mod jar + vanilla jar (repeat --merge for more jars)
+npx minecraft-render mymod.jar output/ --merge minecraft-1.21.jar
+
+# automatic: read the required Minecraft version from the mod and download it
+npx minecraft-render mymod.jar output/ --auto-vanilla --cache-dir ./cache
+```
+
+```ts
+import { Minecraft, inspectJar } from 'minecraft-render';
+
+// what is this jar, and what does it need?
+console.log(await inspectJar('mymod.jar'));
+// { loader: 'fabric', id: 'mymod', minecraft: '~1.21', loaderVersion: '>=0.15', ... }
+
+// open with an explicit vanilla fallback...
+const mc = Minecraft.open(['mymod.jar', 'minecraft-1.21.jar']);
+
+// ...or resolve + download the required vanilla jar automatically
+const mc2 = await Minecraft.forMod('mymod.jar', { cacheDir: './cache' });
+```
+
+Notes:
+
+- Loaders detected: Fabric (`fabric.mod.json`), Forge/NeoForge (`mods.toml`), vanilla (`version.json`).
+- `texture_size` (Blockbench / hi-res atlases) is honored.
+- Models that use a custom loader (e.g. Fabric's `fabric:type`) can't be rendered — their geometry lives in the mod's code, so they are skipped.
+- If a model references another mod's namespace that isn't loaded, the block is skipped with a message suggesting the jar to add (`--merge <namespace>.<version>.jar`).
+
+### Parallel rendering
+
+`render` is single-threaded; `renderParallel` renders across a pool of worker
+processes and yields results as they complete. Rendering is CPU-bound, so this
+scales across cores.
+
+```ts
+const mc = Minecraft.open('minecraft.jar');
+const names = await mc.getBlockNameList();
+
+for await (const { blockName, buffer, skip } of mc.renderParallel(names, {
+  width: 500,
+  height: 500,
+  concurrency: 8, // worker processes; defaults to (CPU cores − 1)
+})) {
+  if (buffer) await fs.promises.writeFile(`render/${blockName}.png`, buffer);
+}
+```
+
+`renderParallel` always uses worker processes (even at `concurrency: 1`), and a
+worker is **recycled** — its process is restarted — every `RECYCLE_EVERY` blocks.
+`headless-gl` never returns its native memory to the OS, so process exit is the
+only thing that reclaims it; recycling keeps memory and per-block time flat over
+long runs.
+
+| Parameter | Where | Default | Purpose |
+| --- | --- | --- | --- |
+| `concurrency` | `renderParallel(names, { concurrency })` | CPU cores − 1 | number of worker processes |
+| `RECYCLE_EVERY` | environment variable | 50 | blocks a worker renders before it is retired and respawned |
+
 ### Tests
 
 Current test configuration is capable of downloading jar files from mojang servers and execute render sequence. You can trigger tests with;
@@ -86,11 +159,6 @@ Current test configuration is capable of downloading jar files from mojang serve
 npm test
 ```
 
-### Headless render and CI
-
-If you are automating generation process on github or similar CI environments, make sure you configured display server. `xvfb` can be used for this purpose.
-
-```sh
-sudo apt-get install xvfb
-xvfb-run --auto-servernum minecraft-render ...
-```
+The test harness reads a few env vars: `WORKERS` (→ `concurrency`),
+`RECYCLE_EVERY`, `WIDTH`, `HEIGHT`, `DISTANCE`, `ANIMATION`, `BLOCK_NAMES`
+(comma-separated filter) and `RENDER_FOLDER`.
