@@ -10,11 +10,10 @@
       "runtimeArgs": ["run-script", "test"],
       "runtimeExecutable": "npm",
       "skipFiles": ["<node_internals>/**"],
-      "type": "pwa-node",
+      "type": "node",
       "env": {
-        "BLOCK_NAMES": "sea_lantern,observer,command_block,slime_block,lectern,blast_furnace_on,prismarine",
-        "RENDER_FOLDER": "render/",
-        "LOGGER_LEVEL": "trace"
+        //   "BLOCK_NAMES": "sea_lantern,observer,command_block,slime_block,lectern,blast_furnace_on,prismarine",
+        "RENDER_FOLDER": "./"
       }
     }
   ]

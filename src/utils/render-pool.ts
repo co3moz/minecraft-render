@@ -40,9 +40,14 @@ export async function* renderPool(
   const config = JSON.stringify({ jarPaths, options });
   const queue = blockNames.slice();
 
+  // headless-gl never returns its native memory to the OS, so a worker that
+  // renders thousands of blocks grows without bound. Retire a worker after
+  // `recycleEvery` blocks and spawn a fresh one to take over — process exit is
+  // the only thing that fully reclaims the memory.
+  const recycleEvery = Number(process.env.RECYCLE_EVERY) || 256;
+
   const pending: ParallelRenderResult[] = [];
-  const workers: ChildProcess[] = [];
-  let exited = 0;
+  const live = new Set<ChildProcess>();
   let failure: unknown = null;
   let wake: (() => void) | null = null;
 
@@ -52,46 +57,60 @@ export async function* renderPool(
     resume?.();
   };
 
-  const dispatch = (worker: ChildProcess) => {
-    const name = queue.shift();
-    worker.send(name === undefined ? { close: true } : { name });
-  };
-
-  for (let i = 0; i < poolSize; i++) {
+  const spawn = () => {
     const worker = fork(workerPath, {
       env: { ...process.env, RENDER_CONFIG: config },
       serialization: 'advanced',
     });
+    live.add(worker);
+    let processed = 0;
+
+    const next = () => {
+      // Retire (don't take another block) once this worker hits its quota; a
+      // replacement is spawned when it exits. The block stays on the queue.
+      if (processed >= recycleEvery && queue.length > 0) {
+        worker.send({ close: true });
+        return;
+      }
+      const name = queue.shift();
+      if (name === undefined) {
+        worker.send({ close: true });
+        return;
+      }
+      processed++;
+      worker.send({ name });
+    };
 
     worker.on('message', (res: ParallelRenderResult) => {
       pending.push(res);
-      dispatch(worker);
+      next();
       signal();
     });
     worker.on('error', (err) => {
       failure ??= err;
-      workers.forEach((w) => w.kill());
+      for (const w of live) w.kill();
       signal();
     });
     worker.on('exit', () => {
-      exited++;
+      live.delete(worker);
+      if (queue.length > 0 && !failure) spawn();
       signal();
     });
 
-    workers.push(worker);
-  }
+    next();
+  };
 
-  for (const worker of workers) dispatch(worker);
+  for (let i = 0; i < poolSize; i++) spawn();
 
   try {
     while (true) {
       while (pending.length) yield pending.shift()!;
       if (failure) throw failure;
-      if (exited === workers.length) return;
+      if (live.size === 0) return;
       await new Promise<void>((resolve) => (wake = resolve));
     }
   } finally {
     // If the consumer stops early (break/throw), make sure no workers linger.
-    for (const worker of workers) if (worker.connected) worker.kill();
+    for (const worker of live) if (worker.connected) worker.kill();
   }
 }

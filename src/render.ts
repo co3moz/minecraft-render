@@ -125,10 +125,15 @@ export async function prepareRenderer({
   };
 }
 
-export async function destroyRenderer(renderer: Renderer) {
+export async function destroyRenderer(renderer: Renderer, immediate = false) {
   Logger.debug(() => `Renderer destroy in progress...`);
 
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  // The delay lets pending GPU work settle before the context is torn down.
+  // Skipped when recycling mid-batch, where renders are already synchronous.
+  if (!immediate) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
   renderer.renderer.info.reset();
   (renderer.canvas as any).__gl__
     .getExtension('STACKGL_destroy_context')
