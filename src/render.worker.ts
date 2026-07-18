@@ -6,12 +6,12 @@ import type { Renderer, RendererOptions } from './utils/types.js';
 // native addon self-registers once per process and cannot be loaded into a
 // worker thread, so parallelism uses child processes: each one owns its own jar
 // handle and GL context, reused across every block it is handed over IPC.
-const { jarPath, options } = JSON.parse(process.env.RENDER_CONFIG!) as {
-  jarPath: string;
+const { jarPaths, options } = JSON.parse(process.env.RENDER_CONFIG!) as {
+  jarPaths: string[];
   options: RendererOptions;
 };
 
-const minecraft = Minecraft.open(jarPath);
+const minecraft = Minecraft.open(jarPaths);
 let rendererPromise: Promise<Renderer> | null = null;
 const getRenderer = () => (rendererPromise ??= prepareRenderer(options));
 

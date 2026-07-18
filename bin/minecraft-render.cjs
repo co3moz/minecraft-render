@@ -21,6 +21,12 @@ program
   .option('-p, --plane', 'debugging plane and axis', 0)
   .option('-A, --no-animation', 'disables apng generation')
   .option('-f, --filter <regex>', 'regex pattern to filter blocks by name')
+  .option(
+    '-m, --merge <jar>',
+    'additional fallback jar (e.g. the vanilla client jar) for mod assets; repeatable',
+    (value, previous) => previous.concat([value]),
+    [],
+  )
   .version(package.version)
   .parse(process.argv);
 
@@ -33,7 +39,10 @@ if (!program.args.length) {
 async function Main() {
   Logger.level = options.verbose;
 
-  const minecraft = Minecraft.open(path.resolve(program.args[0]));
+  const jars = [program.args[0], ...options.merge].map((jar) =>
+    path.resolve(jar),
+  );
+  const minecraft = Minecraft.open(jars);
   const blocks = filterByRegex(options.filter, await minecraft.getBlockList());
 
   let i = 0;

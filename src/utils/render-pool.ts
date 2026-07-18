@@ -28,7 +28,7 @@ function resolveWorker(): string {
  * it (headless-gl can't share a GL context or load into worker threads).
  */
 export async function* renderPool(
-  jarPath: string,
+  jarPaths: string[],
   blockNames: string[],
   options: RendererOptions = {},
   concurrency = Math.max(1, availableParallelism() - 1),
@@ -37,7 +37,7 @@ export async function* renderPool(
 
   const poolSize = Math.max(1, Math.min(concurrency, blockNames.length));
   const workerPath = resolveWorker();
-  const config = JSON.stringify({ jarPath, options });
+  const config = JSON.stringify({ jarPaths, options });
   const queue = blockNames.slice();
 
   const pending: ParallelRenderResult[] = [];
