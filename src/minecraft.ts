@@ -1,6 +1,5 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { availableParallelism } from 'node:os';
 import { destroyRenderer, prepareRenderer, render } from './render.js';
 import { Jar } from './utils/jar.js';
 import {
@@ -273,66 +272,20 @@ export class Minecraft {
 
   /**
    * Renders blocks (by name) across a pool of worker processes, yielding each
-   * result as it finishes. Rendering is CPU-bound and synchronous, so this
-   * parallelizes across cores where the single-threaded {@link render} cannot.
+   * result as it finishes. Always uses worker processes — even at concurrency 1
+   * — because headless-gl never returns its native memory to the OS, so process
+   * recycling (see {@link renderPool}) is the only way to keep memory bounded.
    */
-  async *renderParallel(
+  renderParallel(
     blockNames: string[],
     options: RendererOptions = {},
   ): AsyncGenerator<ParallelRenderResult> {
-    const concurrency =
-      options.concurrency ?? Math.max(1, availableParallelism() - 1);
-
-    // A single worker gains nothing from a child process — render inline in
-    // this process (reusing the already-open jars and one renderer) and skip
-    // the fork + loader startup overhead.
-    if (concurrency <= 1) {
-      yield* this.renderInline(blockNames, options);
-      return;
-    }
-
-    yield* renderPool(
+    return renderPool(
       this.jars.map((jar) => jar.file),
       blockNames,
       options,
-      concurrency,
+      options.concurrency,
     );
-  }
-
-  protected async *renderInline(
-    blockNames: string[],
-    options: RendererOptions,
-  ): AsyncGenerator<ParallelRenderResult> {
-    // headless-gl accumulates native memory across texture/context churn and
-    // does not release it on GC or dispose, so a long-lived context leaks and
-    // each render gets slower. Periodically tear the GL context down and
-    // rebuild it (also resetting the reuse cache) to keep memory and speed flat.
-    const recycleEvery = Number(process.env.RECYCLE_EVERY) || 128;
-
-    try {
-      await this.prepareRenderEnvironment(options);
-      let sinceRecycle = 0;
-
-      for (const blockName of blockNames) {
-        try {
-          const block = await this.getModel(blockName);
-          const result = await render(this, block);
-          yield result.buffer
-            ? { blockName, buffer: result.buffer }
-            : { blockName, skip: result.skip };
-        } catch (err: any) {
-          yield { blockName, error: err?.message || String(err) };
-        }
-
-        if (++sinceRecycle >= recycleEvery) {
-          await this.cleanupRenderEnvironment(true);
-          await this.prepareRenderEnvironment(options);
-          sinceRecycle = 0;
-        }
-      }
-    } finally {
-      await this.cleanupRenderEnvironment();
-    }
   }
 
   async getModel(blockName: string): Promise<BlockModel> {
@@ -373,8 +326,8 @@ export class Minecraft {
     this.renderer = await prepareRenderer(options);
   }
 
-  async cleanupRenderEnvironment(immediate = false) {
-    await destroyRenderer(this.renderer!, immediate);
+  async cleanupRenderEnvironment() {
+    await destroyRenderer(this.renderer!);
     this.renderer = null;
   }
 

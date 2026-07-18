@@ -17,7 +17,10 @@ const getRenderer = () => (rendererPromise ??= prepareRenderer(options));
 
 process.on('message', async (msg: { name: string } | { close: true }) => {
   if ('close' in msg) {
-    if (rendererPromise) await destroyRenderer(await rendererPromise);
+    // Recycled or finished: the process is about to exit (which is what frees
+    // headless-gl's native memory), so tear the context down immediately
+    // without the settle delay.
+    if (rendererPromise) await destroyRenderer(await rendererPromise, true);
     await minecraft.close();
     process.disconnect();
     return;
