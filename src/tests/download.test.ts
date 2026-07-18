@@ -18,7 +18,7 @@ export class DownloadTest extends Test({ timeout: 120000 }) {
     const response = await fetch(
       `https://launchermeta.mojang.com/mc/game/version_manifest.json`,
     );
-    const manifest: VersionManifest = await response.json();
+    const manifest = (await response.json()) as VersionManifest;
     this.targetVersionUrl = manifest.versions.find(
       (version) =>
         version.type == 'release' || version.id == manifest.latest.release,
@@ -28,7 +28,7 @@ export class DownloadTest extends Test({ timeout: 120000 }) {
   async getVersionJarUrl() {
     checkExistingJar(this);
     const response = await fetch(this.targetVersionUrl);
-    const version: Version = await response.json();
+    const version = (await response.json()) as Version;
     this.jarUrl = version.downloads.client.url;
   }
 

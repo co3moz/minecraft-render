@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 
-const program = require('commander');
+const { program } = require('commander');
 const path = require('path');
 const fs = require('fs');
 const package = require('../package.json');
-const mkdirp = require('mkdirp');
+const { mkdirp } = require('mkdirp');
 const { Minecraft, Logger } = require('../dist');
 
 program
   .usage('<jar> [output]')
+  .arguments('[jar] [output]')
   .option('-w, --width [width]', 'output image width', 1000)
   .option('-t, --height [height]', 'output image height', 1000)
   .option('-d, --distance [distance]', 'distance between camera and block', 20)
@@ -97,7 +98,10 @@ async function Main() {
       continue;
     }
 
-    const filePath = path.join(folder, block.blockName + '.png');
+    const filePath = path.join(
+      folder,
+      block.blockName.replace(/\//g, '_') + '.png',
+    );
     await fs.promises.writeFile(filePath, block.buffer);
 
     console.log(

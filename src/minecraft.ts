@@ -289,9 +289,13 @@ export class Minecraft {
   }
 
   async getModel(blockName: string): Promise<BlockModel> {
+    // Names from getBlockNameList are relative to `models/block/`, so the
+    // top-level lookup lives under `block/` — including subdirectories like
+    // Create's `track_observer/block`. Interior parent refs keep their own
+    // category (`block/…`, `item/…`) and are resolved as-authored.
     const ref = blockName.includes(':')
       ? blockName
-      : `${await this.namespace()}:${blockName}`;
+      : `${await this.namespace()}:block/${blockName}`;
 
     return this.resolveModel(ref, blockName);
   }

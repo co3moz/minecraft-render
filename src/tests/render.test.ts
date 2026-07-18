@@ -14,60 +14,10 @@ export class RenderTest extends Test({
     minecraftTest: () => MinecraftTest,
   },
 }) {
-  minecraftTest!: MinecraftTest;
-
   async renderAll() {
-    const names = pickBlocks(
+    const names = this._pickBlocks(
       await this.minecraftTest.minecraft.getBlockNameList(),
-    ).filter((name) => {
-      if (name.startsWith('template_')) {
-        return false;
-      }
-
-      if (
-        name.endsWith('_x') ||
-        name.endsWith('_y') ||
-        name.endsWith('_z') ||
-        name.endsWith('_rot_0') ||
-        name.endsWith('_rot_1') ||
-        name.endsWith('_rot_2') ||
-        name.endsWith('_rot_3') ||
-        name.endsWith('_center') ||
-        name.endsWith('_inventory') ||
-        name.endsWith('_left') ||
-        name.endsWith('_right') ||
-        name.endsWith('_unconnected') ||
-        name.endsWith('_unpowered') ||
-        name.endsWith('_mirrored') ||
-        name.endsWith('_mirrored_all') ||
-        name.endsWith('_cross') ||
-        name.endsWith('_cross_emissive') ||
-        name.endsWith('_frame_filled') ||
-        name.endsWith('_triggered') ||
-        name.endsWith('_crafting') ||
-        name.endsWith('_age0') ||
-        name.endsWith('_age1') ||
-        name.endsWith('_noside') ||
-        name.endsWith('_noside_alt') ||
-        name.endsWith('_post') ||
-        name.endsWith('_side') ||
-        name.endsWith('_side_alt') ||
-        name.endsWith('_lit') ||
-        name.endsWith('_powered') ||
-        name.endsWith('_pressed') ||
-        name.endsWith('_side_tall') ||
-        name.endsWith('_top') ||
-        name.endsWith('_inner') ||
-        name.endsWith('_outer') ||
-        name.endsWith('_cap') ||
-        name.endsWith('_cap_alt') ||
-        name.endsWith('_post_ends')
-      ) {
-        return false;
-      }
-
-      return true;
-    });
+    );
 
     const outDir = path.resolve(__dirname, '../../test-data');
     const prefix = process.env.RENDER_FOLDER || '';
@@ -101,25 +51,76 @@ export class RenderTest extends Test({
         );
       } else {
         await fs.writeFile(
-          path.resolve(outDir, `${prefix}${res.blockName}.png`),
+          path.resolve(
+            outDir,
+            `${prefix}${res.blockName.replaceAll('/', '_')}.png`,
+          ),
           res.buffer!,
         );
         console.log(`${done}/${total} Rendering ${res.blockName} successfully`);
       }
     }
   }
-}
 
-function pickBlocks(blocks: string[]) {
-  const { BLOCK_NAMES } = process.env;
+  _pickBlocks(blocks: string[]) {
+    const { BLOCK_NAMES } = process.env;
 
-  if (!BLOCK_NAMES) {
-    return blocks;
+    if (!BLOCK_NAMES) {
+      return blocks.filter((name) => {
+        if (name.startsWith('template_')) {
+          return false;
+        }
+
+        if (
+          name.endsWith('_x') ||
+          name.endsWith('_y') ||
+          name.endsWith('_z') ||
+          name.endsWith('_rot_0') ||
+          name.endsWith('_rot_1') ||
+          name.endsWith('_rot_2') ||
+          name.endsWith('_rot_3') ||
+          name.endsWith('_center') ||
+          name.endsWith('_inventory') ||
+          name.endsWith('_left') ||
+          name.endsWith('_right') ||
+          name.endsWith('_unconnected') ||
+          name.endsWith('_unpowered') ||
+          name.endsWith('_mirrored') ||
+          name.endsWith('_mirrored_all') ||
+          name.endsWith('_cross') ||
+          name.endsWith('_cross_emissive') ||
+          name.endsWith('_frame_filled') ||
+          name.endsWith('_triggered') ||
+          name.endsWith('_crafting') ||
+          name.endsWith('_age0') ||
+          name.endsWith('_age1') ||
+          name.endsWith('_noside') ||
+          name.endsWith('_noside_alt') ||
+          name.endsWith('_post') ||
+          name.endsWith('_side') ||
+          name.endsWith('_side_alt') ||
+          name.endsWith('_lit') ||
+          name.endsWith('_powered') ||
+          name.endsWith('_pressed') ||
+          name.endsWith('_side_tall') ||
+          name.endsWith('_top') ||
+          name.endsWith('_inner') ||
+          name.endsWith('_outer') ||
+          name.endsWith('_cap') ||
+          name.endsWith('_cap_alt') ||
+          name.endsWith('_post_ends')
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+
+    const preferred = BLOCK_NAMES.split(',');
+
+    Logger.info(() => `BLOCK_NAMES flag is enabled. "${BLOCK_NAMES}"`);
+
+    return blocks.filter((block) => preferred.some((name) => name == block));
   }
-
-  const preferred = BLOCK_NAMES.split(',');
-
-  Logger.info(() => `BLOCK_NAMES flag is enabled. "${BLOCK_NAMES}"`);
-
-  return blocks.filter((block) => preferred.some((name) => name == block));
 }
