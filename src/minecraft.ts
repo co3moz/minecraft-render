@@ -1,5 +1,9 @@
 import { destroyRenderer, prepareRenderer, render } from './render.js';
 import { Jar } from './utils/jar.js';
+import {
+  renderPool,
+  type ParallelRenderResult,
+} from './utils/render-pool.js';
 import type {
   AnimationMeta,
   BlockModel,
@@ -107,6 +111,23 @@ export class Minecraft {
     } finally {
       await this.cleanupRenderEnvironment();
     }
+  }
+
+  /**
+   * Renders blocks (by name) across a pool of worker processes, yielding each
+   * result as it finishes. Rendering is CPU-bound and synchronous, so this
+   * parallelizes across cores where the single-threaded {@link render} cannot.
+   */
+  renderParallel(
+    blockNames: string[],
+    options: RendererOptions = {},
+  ): AsyncGenerator<ParallelRenderResult> {
+    return renderPool(
+      this.jar.file,
+      blockNames,
+      options,
+      options.concurrency,
+    );
   }
 
   async getModel(blockName: string): Promise<BlockModel> {

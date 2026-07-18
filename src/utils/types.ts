@@ -99,4 +99,6 @@ export interface RendererOptions {
   verbose?: number;
   plane?: number;
   animation?: boolean;
+  /** Worker processes for `Minecraft.renderParallel`; defaults to cores - 1. */
+  concurrency?: number;
 }

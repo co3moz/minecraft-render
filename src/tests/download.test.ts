@@ -1,8 +1,10 @@
 import { Test, skipTest } from 'nole';
-import fetch from 'node-fetch';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import type { ReadableStream } from 'node:stream/web';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,13 +38,10 @@ export class DownloadTest extends Test({ timeout: 120000 }) {
 
     this.jarPath = getPath();
 
-    const stream = fs.createWriteStream(this.jarPath);
-
-    await new Promise((resolve, reject) => {
-      response.body.pipe(stream);
-      response.body.on('error', reject);
-      stream.on('close', resolve);
-    });
+    await pipeline(
+      Readable.fromWeb(response.body as ReadableStream<Uint8Array>),
+      fs.createWriteStream(this.jarPath),
+    );
   }
 }
 
