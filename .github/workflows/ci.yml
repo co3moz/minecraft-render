@@ -16,9 +16,10 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-      # gl builds from source and needs X11 + Mesa GL/GLEW headers; install
-      # them before `npm ci` runs gl's build script.
-      - name: Install headless-gl build dependencies
+      # gl builds from source and needs X11 + Mesa GL/GLEW headers. Installed
+      # unconditionally: the -dev packages also pull in the runtime .so files gl
+      # loads at test time, which are needed even when node_modules is cached.
+      - name: Install headless-gl system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -26,7 +27,17 @@ jobs:
             libx11-dev libxi-dev libxext-dev \
             libgl1-mesa-dev libglu1-mesa-dev libglew-dev \
             xvfb
-      - run: npm ci
+      # Cache the built node_modules (including gl's compiled binary) so the
+      # expensive native build only runs when package-lock.json changes.
+      - name: Cache node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-ubuntu-22.04-node22-${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       - run: xvfb-run --auto-servernum npm test
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
