@@ -1,0 +1,112 @@
+name: Wiki Gallery
+
+# Weekly: if a Minecraft release exists that the wiki does not yet have a
+# gallery for, render it and publish a per-version page to the wiki.
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch: {}
+
+# Pushing to the wiki repo uses the default token's contents scope.
+permissions:
+  contents: write
+
+# Never let two runs push to the wiki at once.
+concurrency:
+  group: wiki-gallery
+  cancel-in-progress: false
+
+jobs:
+  # Cheap gate: figure out the latest release and whether the wiki already has
+  # it, so the expensive render only runs when there is genuinely new work.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+      is_new: ${{ steps.detect.outputs.is_new }}
+    steps:
+      - name: Detect latest release vs. wiki
+        id: detect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version=$(curl -sf https://launchermeta.mojang.com/mc/game/version_manifest.json | jq -r '.latest.release')
+          echo "Latest release: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # Wiki may not be initialized yet; a failed clone means "publish it".
+          if git clone --depth 1 \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki 2>/dev/null; then
+            if [ -f "wiki/Blocks-${version}.md" ]; then
+              echo "Wiki already has $version."
+              echo "is_new=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "Wiki is missing $version."
+              echo "is_new=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No wiki checkout (uninitialized?) — treating as new."
+            echo "is_new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  render:
+    needs: check
+    if: needs.check.outputs.is_new == 'true'
+    # Same 22.04 pin as the test workflow: gl's bundled ANGLE fails to build on
+    # newer GCC.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install headless-gl system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config \
+            libx11-dev libxi-dev libxext-dev \
+            libgl1-mesa-dev libglu1-mesa-dev libglew-dev \
+            xvfb
+      - name: Cache node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-ubuntu-22.04-node22-${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # Renders the latest release into test-data/*.png at 256x256.
+      - name: Render blocks
+        run: xvfb-run --auto-servernum npm test
+        env:
+          WIDTH: '256'
+          HEIGHT: '256'
+      - name: Clone wiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git clone \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
+      - name: Generate wiki page
+        env:
+          REPO: ${{ github.repository }}
+          WIKI_DIR: wiki
+          TEST_DATA_DIR: test-data
+        run: node scripts/generate-wiki.mjs
+      - name: Commit and push to wiki
+        working-directory: wiki
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "Add gallery for Minecraft ${{ needs.check.outputs.version }}"
+            git push
+          fi
