@@ -1,4 +1,4 @@
-[![Rendered image](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/soul_campfire_small.png)](https://github.com/co3moz/minecraft-render/blob/master/docs/soul_campfire.png)
+[![Rendered image](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/soul_campfire.png)](https://github.com/co3moz/minecraft-render/blob/master/docs/soul_campfire.png)
 
 minecraft-render
 =======================
@@ -9,9 +9,14 @@ and rendering can be **parallelized** across worker processes.
 
 ### Pre-rendered assets
 
-You can find pre-rendered assets on Github Actions artifacts. By clicking the badge down below, you can access action list.
+Pre-rendered block & item galleries live in the [wiki](https://github.com/co3moz/minecraft-render/wiki),
+with a separate page per Minecraft release. A weekly job renders any new
+release automatically.
+
+Browse them here: [minecraft-render wiki](https://github.com/co3moz/minecraft-render/wiki)
 
 [![Render Test](https://github.com/co3moz/minecraft-render/actions/workflows/ci.yml/badge.svg)](https://github.com/co3moz/minecraft-render/actions/workflows/ci.yml)
+[![Wiki Gallery](https://github.com/co3moz/minecraft-render/actions/workflows/wiki-gallery.yml/badge.svg)](https://github.com/co3moz/minecraft-render/actions/workflows/wiki-gallery.yml)
 
 ### Binaries
 
