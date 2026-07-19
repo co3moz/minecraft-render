@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Canvas as SkiaCanvas } from 'skia-canvas';
 import type {
+  AnimationMeta,
   BlockModel,
   BlockSides,
   Element,
@@ -44,6 +45,8 @@ export async function prepareRenderer({
   plane = 0,
   animation = true,
   renderWithoutGui = false,
+  interpolate = true,
+  interpolationSteps = INTERP_SUBFRAMES,
 }: RendererOptions): Promise<Renderer> {
   const scene = new THREE.Scene();
 
@@ -141,7 +144,16 @@ export async function prepareRenderer({
     light,
     textureCache: {},
     animatedCache: {},
-    options: { width, height, distance, plane, animation, renderWithoutGui },
+    options: {
+      width,
+      height,
+      distance,
+      plane,
+      animation,
+      renderWithoutGui,
+      interpolate,
+      interpolationSteps,
+    },
   };
 }
 
@@ -199,15 +211,19 @@ export async function render(
 
   Logger.trace(() => `Camera zoom = ${camera.zoom}`);
 
-  if (typeof block.animationCurrentTick == 'undefined') {
-    block.animationCurrentTick = 0;
-  }
+  // Work out which ticks to actually render (the frames of the animation) and
+  // how long each one lasts, instead of rendering one image per game tick.
+  const schedule = options.animation
+    ? await buildAnimationSchedule(minecraft, block, activeRenderer)
+    : { ticks: [0], durations: [1] };
 
   const buffers = [];
+  const frameDurations = schedule.durations;
   const clean: THREE.Mesh[] = [];
 
   try {
-    do {
+    for (const tick of schedule.ticks) {
+      block.animationCurrentTick = tick;
       Logger.trace(() => `Frame[${block.animationCurrentTick}] started`);
 
       clean.length = 0;
@@ -328,17 +344,16 @@ export async function render(
       Logger.trace(() => `Scene cleared`);
 
       Logger.trace(() => `Frame[${block.animationCurrentTick}] completed`);
-    } while (
-      options.animation &&
-      (block.animationMaxTicks ?? 1) > ++block.animationCurrentTick
-    );
+    }
 
     resultBlock.buffer =
       buffers.length == 1
         ? buffers[0]
         : makeAnimatedPNG(buffers, (index) => ({
-            numerator: 1,
-            denominator: 10,
+            // Minecraft animates at 20 ticks/second, so a frame lasting N ticks
+            // runs for N/20 seconds.
+            numerator: frameDurations[index],
+            denominator: 20,
           }));
   } catch (e: any) {
     for (const old of clean) {
@@ -349,6 +364,166 @@ export async function render(
   }
 
   return resultBlock;
+}
+
+type FrameStep = { index: number; time: number };
+
+// Expands animation metadata into an explicit playback list of image frames
+// with their durations (in ticks), honouring a custom `frames` order/timing.
+function buildTimeline(meta: AnimationMeta, frameCount: number): FrameStep[] {
+  const frametime = meta.frametime && meta.frametime > 0 ? meta.frametime : 1;
+
+  if (Array.isArray(meta.frames) && meta.frames.length) {
+    return meta.frames.map((f) =>
+      typeof f === 'number'
+        ? { index: f, time: frametime }
+        : { index: f.index, time: f.time && f.time > 0 ? f.time : frametime },
+    );
+  }
+
+  return Array.from({ length: frameCount }, (_, i) => ({
+    index: i,
+    time: frametime,
+  }));
+}
+
+// The image frame shown at a given tick within the texture's looping timeline.
+function frameAtTick(
+  meta: AnimationMeta,
+  frameCount: number,
+  tick: number,
+): number {
+  const timeline = buildTimeline(meta, frameCount);
+  const cycle = timeline.reduce((sum, step) => sum + step.time, 0) || 1;
+
+  let offset = ((tick % cycle) + cycle) % cycle;
+  for (const step of timeline) {
+    if (offset < step.time) return step.index;
+    offset -= step.time;
+  }
+  return timeline[timeline.length - 1].index;
+}
+
+// Sub-frames rendered per interpolated transition (a blend is generated at each).
+const INTERP_SUBFRAMES = 8;
+
+// For an interpolated texture, the two image frames to blend at a tick and the
+// blend factor (0 = fully `from`, →1 = approaching `to`).
+function interpolationAtTick(
+  meta: AnimationMeta,
+  frameCount: number,
+  tick: number,
+): { from: number; to: number; factor: number } {
+  const timeline = buildTimeline(meta, frameCount);
+  const cycle = timeline.reduce((sum, step) => sum + step.time, 0) || 1;
+
+  let offset = ((tick % cycle) + cycle) % cycle;
+  for (let i = 0; i < timeline.length; i++) {
+    const step = timeline[i];
+    if (offset < step.time) {
+      const next = timeline[(i + 1) % timeline.length];
+      return {
+        from: step.index,
+        to: next.index,
+        factor: step.time > 0 ? offset / step.time : 0,
+      };
+    }
+    offset -= step.time;
+  }
+  const last = timeline[timeline.length - 1];
+  return { from: last.index, to: last.index, factor: 0 };
+}
+
+function gcd(a: number, b: number): number {
+  while (b) [a, b] = [b, a % b];
+  return a;
+}
+
+// Collects the animation timelines of every animated texture on the block and
+// returns the distinct ticks that must be rendered (a frame changes on one of
+// them) plus how long each rendered frame lasts. Non-animated blocks yield a
+// single static frame.
+async function buildAnimationSchedule(
+  minecraft: Minecraft,
+  block: BlockModel,
+  renderer: Renderer,
+): Promise<{ ticks: number[]; durations: number[] }> {
+  const cycles: number[] = [];
+  const boundaries: number[][] = [];
+  const seen = new Set<string>();
+
+  for (const element of block.elements ?? []) {
+    for (const direction of MATERIAL_FACE_ORDER) {
+      const face = element.faces?.[direction];
+      if (!face) continue;
+
+      const path = decodeTexture(face.texture, block);
+      if (!path || seen.has(path)) continue;
+      seen.add(path);
+
+      const meta =
+        renderer.animatedCache[path] ??
+        (renderer.animatedCache[path] =
+          await minecraft.getTextureMetadata(path));
+      if (!meta) continue;
+
+      const image =
+        renderer.textureCache['image:' + path] ??
+        (renderer.textureCache['image:' + path] = await loadImage(
+          await minecraft.getTextureFile(path),
+        ));
+      const frameCount = Math.max(1, Math.floor(image.height / image.width));
+      if (frameCount < 2) continue;
+
+      const timeline = buildTimeline(meta, frameCount);
+      const cycle = timeline.reduce((sum, step) => sum + step.time, 0);
+      if (cycle < 1) continue;
+
+      // Interpolated textures need extra render points within each step so the
+      // frame-to-frame blend can be sampled; others only render on frame change.
+      const interpolate = !!(renderer.options.interpolate && meta.interpolate);
+      const steps = Math.max(
+        1,
+        renderer.options.interpolationSteps ?? INTERP_SUBFRAMES,
+      );
+      const bounds: number[] = [];
+      let t = 0;
+      for (const step of timeline) {
+        if (interpolate) {
+          const sub = Math.min(step.time, steps);
+          for (let k = 0; k < sub; k++) {
+            bounds.push(t + Math.floor((k * step.time) / sub));
+          }
+        } else {
+          bounds.push(t);
+        }
+        t += step.time;
+      }
+      cycles.push(cycle);
+      boundaries.push(bounds);
+    }
+  }
+
+  if (cycles.length === 0) return { ticks: [0], durations: [1] };
+
+  let globalCycle = cycles.reduce((a, b) => (a / gcd(a, b)) * b, 1);
+  // Guard against a pathological least-common-multiple from mismatched cycles.
+  if (globalCycle > 20000) globalCycle = Math.max(...cycles);
+
+  const keyframes = new Set<number>();
+  for (let i = 0; i < cycles.length; i++) {
+    for (let base = 0; base < globalCycle; base += cycles[i]) {
+      for (const bound of boundaries[i]) {
+        if (base + bound < globalCycle) keyframes.add(base + bound);
+      }
+    }
+  }
+
+  const ticks = [...keyframes].sort((a, b) => a - b);
+  const durations = ticks.map(
+    (tick, i) => (i + 1 < ticks.length ? ticks[i + 1] : globalCycle) - tick,
+  );
+  return { ticks, durations };
 }
 
 async function constructTextureMaterial(
@@ -377,23 +552,23 @@ async function constructTextureMaterial(
   const width = image.width;
   let height = animationMeta ? width : image.height;
   let frame = 0;
+  let blend: { from: number; to: number; factor: number } | null = null;
 
   if (animationMeta) {
-    // TODO: Consider custom frame times
     Logger.trace(() => `Face[${direction}] is animated!`);
 
-    const frameCount = image.height / width;
+    const frameCount = Math.max(1, Math.floor(image.height / width));
+    const tick = block.animationCurrentTick ?? 0;
 
-    if (block.animationCurrentTick == 0) {
-      block.animationMaxTicks = Math.max(
-        block.animationMaxTicks || 1,
-        frameCount * (animationMeta.frametime || 1),
-      );
+    if (activeRenderer.options.interpolate && animationMeta.interpolate) {
+      const step = interpolationAtTick(animationMeta, frameCount, tick);
+      if (step.from === step.to || step.factor <= 0) {
+        frame = step.from;
+      } else {
+        blend = step;
+      }
     } else {
-      frame =
-        Math.floor(
-          block.animationCurrentTick! / (animationMeta.frametime || 1),
-        ) % frameCount;
+      frame = frameAtTick(animationMeta, frameCount, tick);
     }
   }
 
@@ -409,7 +584,10 @@ async function constructTextureMaterial(
   const scaleX = width / texW;
   const scaleY = height / texH;
 
-  const materialCacheKey = `material:${path}_${face.rotation || 0}_${face.uv ? face.uv.join(',') : ''}_${frame}_${shaded ? 's' : 'u'}_${texW}x${texH}`;
+  const frameKey = blend
+    ? `${blend.from}-${blend.to}@${blend.factor.toFixed(3)}`
+    : `${frame}`;
+  const materialCacheKey = `material:${path}_${face.rotation || 0}_${face.uv ? face.uv.join(',') : ''}_${frameKey}_${shaded ? 's' : 'u'}_${texW}x${texH}`;
   if (cache[materialCacheKey]) {
     return cache[materialCacheKey];
   }
@@ -444,17 +622,23 @@ async function constructTextureMaterial(
     ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
   }
 
-  ctx.drawImage(
-    image,
-    Math.min(uv[0], uv[2]) * scaleX,
-    Math.min(uv[1], uv[3]) * scaleY + frame * height,
-    Math.abs(uv[2] - uv[0]) * scaleX,
-    Math.abs(uv[3] - uv[1]) * scaleY,
-    0,
-    0,
-    width,
-    height,
-  );
+  const sx = Math.min(uv[0], uv[2]) * scaleX;
+  const syBase = Math.min(uv[1], uv[3]) * scaleY;
+  const sw = Math.abs(uv[2] - uv[0]) * scaleX;
+  const sh = Math.abs(uv[3] - uv[1]) * scaleY;
+
+  const drawFrame = (f: number) =>
+    ctx.drawImage(image, sx, syBase + f * height, sw, sh, 0, 0, width, height);
+
+  if (blend) {
+    // lerp(from, to, factor): draw `from` opaque, then `to` at alpha = factor.
+    drawFrame(blend.from);
+    ctx.globalAlpha = blend.factor;
+    drawFrame(blend.to);
+    ctx.globalAlpha = 1;
+  } else {
+    drawFrame(frame);
+  }
 
   Logger.trace(() => `Face[${direction}] uv applied`);
 

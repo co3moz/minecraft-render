@@ -6,11 +6,15 @@ import { writeFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { Minecraft } from '../minecraft.js';
 import { Logger } from '../utils/logger.js';
+import { RenderTest } from './render.test.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class ModRenderTest extends Test({
   timeout: 600000,
+  dependencies: {
+    renderTest: () => RenderTest,
+  },
 }) {
   minecraft!: Minecraft;
 
@@ -39,6 +43,10 @@ export class ModRenderTest extends Test({
         ? parseInt(process.env.WORKERS)
         : undefined,
       renderWithoutGui: process.env.RENDER_WITHOUT_GUI === 'true',
+      interpolate: process.env.INTERPOLATE !== 'false',
+      interpolationSteps: process.env.INTERPOLATION_STEPS
+        ? parseInt(process.env.INTERPOLATION_STEPS)
+        : undefined,
     };
 
     const total = names.length;
@@ -66,6 +74,10 @@ export class ModRenderTest extends Test({
         console.log(`${done}/${total} Rendering ${res.blockName} successfully`);
       }
     }
+  }
+
+  async generateHtml() {
+    return this.renderTest?.generateHtml();
   }
 
   _pickBlocks(blocks: string[]) {

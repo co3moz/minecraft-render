@@ -108,4 +108,14 @@ export interface RendererOptions {
    * inventory transform instead of skipping them with reason `no gui`.
    */
   renderWithoutGui?: boolean;
+  /**
+   * Honor a texture's `interpolate` animation flag by blending between frames
+   * (smoother, but produces more APNG frames). Defaults to true.
+   */
+  interpolate?: boolean;
+  /**
+   * Blend sub-frames rendered per interpolated transition — higher is smoother
+   * but produces more APNG frames. Defaults to 8.
+   */
+  interpolationSteps?: number;
 }

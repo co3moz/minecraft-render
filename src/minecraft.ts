@@ -236,7 +236,10 @@ export class Minecraft {
     const path = resolveAssetPath(name ?? '', 'textures', '.png.mcmeta');
 
     try {
-      return await this.readJson(path);
+      // .mcmeta wraps the fields under an `animation` key; unwrap it so callers
+      // get the flat AnimationMeta (frametime / frames / interpolate).
+      const meta = await this.readJson(path);
+      return meta?.animation ?? null;
     } catch (e) {
       return null;
     }

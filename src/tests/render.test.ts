@@ -1,4 +1,4 @@
-import { Test } from 'nole';
+import { skipTest, Test } from 'nole';
 import { MinecraftTest } from './minecraft.test.js';
 
 import * as path from 'path';
@@ -14,6 +14,18 @@ export class RenderTest extends Test({
     minecraftTest: () => MinecraftTest,
   },
 }) {
+  async cleanTestDataFolder() {
+    const outDir = path.resolve(__dirname, '../../test-data');
+    const files = await fs.readdir(outDir);
+    const pngFiles = files.filter((file) => file.endsWith('.png'));
+
+    console.log(`Found ${pngFiles.length} png files in ${outDir}. Removing...`);
+
+    for (const file of pngFiles) {
+      await fs.unlink(path.resolve(outDir, file));
+    }
+  }
+
   async renderAll() {
     const names = this._pickBlocks(
       await this.minecraftTest.minecraft.getBlockNameList(),
@@ -31,6 +43,10 @@ export class RenderTest extends Test({
         ? parseInt(process.env.WORKERS)
         : undefined,
       renderWithoutGui: process.env.RENDER_WITHOUT_GUI === 'true',
+      interpolate: process.env.INTERPOLATE !== 'false',
+      interpolationSteps: process.env.INTERPOLATION_STEPS
+        ? parseInt(process.env.INTERPOLATION_STEPS)
+        : undefined,
     };
 
     const total = names.length;
@@ -61,6 +77,41 @@ export class RenderTest extends Test({
         console.log(`${done}/${total} Rendering ${res.blockName} successfully`);
       }
     }
+  }
+
+  async generateHtml() {
+    // find .png files on test-data
+    const outDir = path.resolve(__dirname, '../../test-data');
+    const prefix = process.env.RENDER_FOLDER || '';
+    const files = await fs.readdir(outDir);
+    const pngFiles = files.filter((file) => file.endsWith('.png'));
+
+    let html = `<html><head>
+    <style>
+    body {
+      margin: 0;
+      background:#383838;
+    }
+    img {
+      width: 128px;
+      height: 128px;
+    }
+    img:hover {
+      background: #444;
+    }
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    </style>
+    </head><body>
+      <div class="container">
+      `;
+    for (const file of pngFiles) {
+      html += `<img src="${file}" />`;
+    }
+    html += `</div></body></html>`;
+    await fs.writeFile(path.resolve(outDir, 'index.html'), html);
   }
 
   _pickBlocks(blocks: string[]) {

@@ -41,6 +41,11 @@ program
     '--render-without-gui',
     'render blocks that have no gui transform (using the default) instead of skipping them',
   )
+  .option('--no-interpolate', 'disable smooth frame interpolation for animations')
+  .option(
+    '--interpolation-steps <n>',
+    'blend sub-frames per interpolated animation transition (default: 8)',
+  )
   .version(package.version)
   .parse(process.argv);
 
@@ -84,6 +89,10 @@ async function Main() {
     plane: options.plane,
     animation: options.animation,
     renderWithoutGui: options.renderWithoutGui,
+    interpolate: options.interpolate,
+    interpolationSteps: options.interpolationSteps
+      ? parseInt(options.interpolationSteps)
+      : undefined,
   };
 
   const missingJars = new Map();
