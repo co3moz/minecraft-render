@@ -3,3 +3,4 @@ test-data
 *.jar
 .vscode
 .github
+scripts
