@@ -2,6 +2,17 @@ name: Test
 
 on: [push]
 
+# Needed by the deploy job to publish to GitHub Pages via OIDC.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent Pages deployment; newer pushes cancel in-progress runs.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   test:
     # Pinned to 22.04 (GCC 11): `gl` (headless-gl) v6 bundles an old ANGLE that
@@ -38,12 +49,45 @@ jobs:
       - name: Install dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
+      # 1000x1000 renders are wasteful for the CI gallery; 256x256 is plenty for
+      # the preview grid and keeps the produced site small and the run fast.
       - run: xvfb-run --auto-servernum npm test
+        env:
+          WIDTH: '256'
+          HEIGHT: '256'
       - name: Archive production artifacts
         uses: actions/upload-artifact@v4
         with:
           name: test-result
           path: |
             test-data/*
-            !test-data/test.jar
+            !test-data/*.jar
             !test-data/.gitignore
+      # Assemble the gallery site from just the rendered PNGs + index.html.
+      # index.html references every image by same-directory relative name, so
+      # the test/ subdir and the .jar files are not needed and are left out.
+      - name: Assemble Pages site
+        if: github.ref == 'refs/heads/master'
+        run: |
+          mkdir -p _site
+          cp test-data/index.html _site/
+          cp test-data/*.png _site/
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  # Publishes the assembled gallery to GitHub Pages. Runs only on master and
+  # only after tests pass.
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

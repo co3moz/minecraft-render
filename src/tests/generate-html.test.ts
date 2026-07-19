@@ -4,11 +4,15 @@ import * as fs from 'node:fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ModRenderTest } from './mod-render.test.js';
+import { DownloadTest } from './download.test.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class GenerateHtmlTest extends Test({
   after: () => [RenderTest, ModRenderTest],
+  dependencies: {
+    downloadTest: () => DownloadTest,
+  },
 }) {
   async generateHtml() {
     // find .png files on test-data
@@ -17,11 +21,22 @@ export class GenerateHtmlTest extends Test({
     const files = await fs.readdir(outDir);
     const pngFiles = files.filter((file) => file.endsWith('.png'));
 
+    const version = this.downloadTest.versionId;
+
     let html = `<html><head>
     <style>
     body {
       margin: 0;
       background:#383838;
+    }
+    h1 {
+      margin: 0;
+      padding: 12px 16px;
+      color: #fff;
+      font-family: monospace;
+      font-size: 16px;
+      background: #111;
+      border-bottom: 1px solid #333;
     }
     img {
       width: 128px;
@@ -55,6 +70,7 @@ export class GenerateHtmlTest extends Test({
     }
     </style>
     </head><body>
+      <h1>Minecraft ${version || 'unknown'}</h1>
       <div class="container">
       `;
     for (const file of pngFiles) {
