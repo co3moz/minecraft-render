@@ -1,4 +1,4 @@
-import { skipClass, skipTest, Test } from 'nole';
+import { isSkipped, skipClass, skipTest, Test } from 'nole';
 
 import * as path from 'path';
 import { existsSync } from 'fs';
@@ -17,6 +17,12 @@ export class ModRenderTest extends Test({
   },
 }) {
   minecraft!: Minecraft;
+
+  async before() {
+    if (isSkipped(this.renderTest)) {
+      skipClass('render test skipped');
+    }
+  }
 
   async loadJar() {
     if (!existsSync('./test-data/mod.jar')) {
@@ -74,10 +80,6 @@ export class ModRenderTest extends Test({
         console.log(`${done}/${total} Rendering ${res.blockName} successfully`);
       }
     }
-  }
-
-  async generateHtml() {
-    return this.renderTest?.generateHtml();
   }
 
   _pickBlocks(blocks: string[]) {

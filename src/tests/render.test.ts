@@ -1,4 +1,4 @@
-import { skipTest, Test } from 'nole';
+import { skipClass, Test } from 'nole';
 import { MinecraftTest } from './minecraft.test.js';
 
 import * as path from 'path';
@@ -14,15 +14,13 @@ export class RenderTest extends Test({
     minecraftTest: () => MinecraftTest,
   },
 }) {
-  async cleanTestDataFolder() {
+  async before() {
     const outDir = path.resolve(__dirname, '../../test-data');
     const files = await fs.readdir(outDir);
     const pngFiles = files.filter((file) => file.endsWith('.png'));
 
-    console.log(`Found ${pngFiles.length} png files in ${outDir}. Removing...`);
-
-    for (const file of pngFiles) {
-      await fs.unlink(path.resolve(outDir, file));
+    if (pngFiles.length > 0) {
+      skipClass('png files found, delete them to run this test');
     }
   }
 
@@ -77,41 +75,6 @@ export class RenderTest extends Test({
         console.log(`${done}/${total} Rendering ${res.blockName} successfully`);
       }
     }
-  }
-
-  async generateHtml() {
-    // find .png files on test-data
-    const outDir = path.resolve(__dirname, '../../test-data');
-    const prefix = process.env.RENDER_FOLDER || '';
-    const files = await fs.readdir(outDir);
-    const pngFiles = files.filter((file) => file.endsWith('.png'));
-
-    let html = `<html><head>
-    <style>
-    body {
-      margin: 0;
-      background:#383838;
-    }
-    img {
-      width: 128px;
-      height: 128px;
-    }
-    img:hover {
-      background: #444;
-    }
-    .container {
-      display: flex;
-      flex-wrap: wrap;
-    }
-    </style>
-    </head><body>
-      <div class="container">
-      `;
-    for (const file of pngFiles) {
-      html += `<img src="${file}" />`;
-    }
-    html += `</div></body></html>`;
-    await fs.writeFile(path.resolve(outDir, 'index.html'), html);
   }
 
   _pickBlocks(blocks: string[]) {

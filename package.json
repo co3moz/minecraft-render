@@ -41,7 +41,7 @@
     "@types/three": "^0.162.0",
     "generic-pool": "^3.9.0",
     "mkdirp": "^3.0.1",
-    "nole": "^3.1.0",
+    "nole": "^3.2.1",
     "prettier": "3.9.5",
     "typescript": "^7.0.2"
   }
