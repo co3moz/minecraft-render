@@ -211,9 +211,16 @@ const MANIFEST_URL =
   'https://launchermeta.mojang.com/mc/game/version_manifest.json';
 
 const corsUrl = (url: string) =>
-  'https://corsproxy.io?' + encodeURIComponent(url);
+  'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
 
 async function proxiedFetch(url: string): Promise<Response> {
+  try {
+    const direct = await fetch(url);
+    if (direct.ok) return direct;
+  } catch {
+    /* direct request blocked — try the proxy below */
+  }
+
   const proxied = await fetch(corsUrl(url));
   if (!proxied.ok) throw new Error(`request failed (HTTP ${proxied.status})`);
   return proxied;
