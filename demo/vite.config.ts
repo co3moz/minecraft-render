@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 const stub = fileURLToPath(new URL('./src/empty.ts', import.meta.url));
 
 export default defineConfig({
+  // Served from `/<repo>/` on GitHub Pages (set by CI), `/` everywhere else.
+  base: process.env.BASE_PATH || '/',
   // The linked library ships its own `browser` field + `exports` conditions;
   // let Vite process it through the normal pipeline (rather than esbuild
   // pre-bundling) so those swaps are honored.

@@ -15,6 +15,17 @@ release automatically.
 
 Browse them here: [minecraft-render wiki](https://github.com/co3moz/minecraft-render/wiki)
 
+### Try it in your browser
+
+Those galleries are pre-rendered — want to test it with your **own** jar? The
+renderer also runs entirely client-side, on your browser's GPU:
+
+**[co3moz.github.io/minecraft-render](https://co3moz.github.io/minecraft-render/)**
+
+Drag & drop a mod jar (together with the matching vanilla `minecraft.jar` so
+parent models resolve), spin blocks in 3D, and export PNGs or a zip. Source in
+[`demo/`](demo/).
+
 [![Render Test](https://github.com/co3moz/minecraft-render/actions/workflows/ci.yml/badge.svg)](https://github.com/co3moz/minecraft-render/actions/workflows/ci.yml)
 [![Wiki Gallery](https://github.com/co3moz/minecraft-render/actions/workflows/wiki-gallery.yml/badge.svg)](https://github.com/co3moz/minecraft-render/actions/workflows/wiki-gallery.yml)
 
