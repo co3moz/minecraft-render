@@ -1,0 +1,19 @@
+{
+  "name": "minecraft-render-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "minecraft-render": "file:.."
+  },
+  "devDependencies": {
+    "buffer": "^6.0.3",
+    "fflate": "^0.8.3",
+    "vite": "^5.4.0"
+  }
+}

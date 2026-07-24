@@ -1,13 +1,7 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { destroyRenderer, prepareRenderer, render } from './render.js';
 import { Jar } from './utils/jar.js';
-import { renderPool, type ParallelRenderResult } from './utils/render-pool.js';
+import type { ParallelRenderResult } from './utils/render-pool.js';
 import { inspectJar, type JarInfo } from './utils/mod-info.js';
-import {
-  downloadMinecraftJar,
-  resolveMinecraftVersion,
-} from './utils/vanilla-download.js';
 import type {
   AnimationMeta,
   BlockModel,
@@ -66,6 +60,14 @@ export class Minecraft {
     modSource: MinecraftSource,
     options: ForModOptions = {},
   ): Promise<Minecraft> {
+    // Node-only helpers loaded lazily so this module stays importable in the
+    // browser (where `forMod`, which downloads a vanilla jar, is never used).
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { downloadMinecraftJar, resolveMinecraftVersion } = await import(
+      './utils/vanilla-download.js'
+    );
+
     const { cacheDir = process.cwd(), download = true, onProgress } = options;
     const note = (message: string) => onProgress?.(message);
 
@@ -289,11 +291,14 @@ export class Minecraft {
    * — because headless-gl never returns its native memory to the OS, so process
    * recycling (see {@link renderPool}) is the only way to keep memory bounded.
    */
-  renderParallel(
+  async *renderParallel(
     blockNames: string[],
     options: RendererOptions = {},
   ): AsyncGenerator<ParallelRenderResult> {
-    return renderPool(
+    // Worker-pool rendering is Node-only (child processes + headless-gl); loaded
+    // lazily so the browser bundle never pulls in `node:child_process` et al.
+    const { renderPool } = await import('./utils/render-pool.js');
+    yield* renderPool(
       this.jars.map((jar) => jar.file),
       blockNames,
       options,

@@ -14,6 +14,16 @@ program
   .option('-t, --height [height]', 'output image height', 1000)
   .option('-d, --distance [distance]', 'distance between camera and block', 20)
   .option(
+    '-c, --camera <type>',
+    'camera projection: "orthographic" (default) or "perspective"',
+    'orthographic',
+  )
+  .option(
+    '-l, --light-angle <degrees>',
+    'rotate the key light around the vertical axis (default: 0)',
+    0,
+  )
+  .option(
     '-v, --verbose',
     'increases logging level',
     (v, p) => (typeof v != 'undefined' ? v : p + 1),
@@ -86,6 +96,8 @@ async function Main() {
     height: parseInt(options.height),
     width: parseInt(options.width),
     distance: parseInt(options.distance),
+    cameraType: options.camera === 'perspective' ? 'perspective' : 'orthographic',
+    lightAngle: parseFloat(options.lightAngle) || 0,
     plane: options.plane,
     animation: options.animation,
     renderWithoutGui: options.renderWithoutGui,

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>minecraft-render · browser demo</title>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>minecraft-render</h1>
+        <p class="tagline">
+          Drop a Minecraft <code>.jar</code> and render its blocks — entirely in
+          your browser's GPU, using the same renderer as the Node library.
+        </p>
+      </header>
+
+      <section id="dropzone" class="dropzone">
+        <div class="dropzone-inner">
+          <div class="drop-icon">⬇</div>
+          <p><strong>Drop .jar files here</strong> or click to browse</p>
+          <p class="hint">
+            Tip: drop a mod jar together with the matching vanilla
+            <code>minecraft.jar</code> so parent models &amp; textures resolve.
+          </p>
+          <input id="file-input" type="file" accept=".jar,.zip" multiple hidden />
+        </div>
+      </section>
+
+      <section id="controls" class="controls" hidden>
+        <div class="jar-info" id="jar-info"></div>
+        <div class="control-row">
+          <input id="search" type="search" placeholder="Filter blocks…" />
+          <span class="status" id="status"></span>
+          <button id="render-all">Render all → download</button>
+          <button id="reset-btn" class="ghost">Reset</button>
+        </div>
+        <p class="hint">
+          Blocks render as they scroll into view — hover to spin, click for a
+          rotatable 3D preview.
+        </p>
+      </section>
+
+      <section id="grid" class="grid"></section>
+    </div>
+
+    <!-- Rotatable live preview -->
+    <div id="preview" class="preview-overlay" hidden>
+      <div class="preview-box">
+        <div class="preview-head">
+          <span class="preview-name" id="preview-name"></span>
+          <label class="spin-toggle">
+            <input type="checkbox" id="spin" />
+            <span>Spin</span>
+          </label>
+          <button id="preview-download" class="small">Download rendered</button>
+          <button id="preview-close" class="ghost">✕</button>
+        </div>
+        <div class="preview-stage" id="preview-stage"></div>
+        <div class="preview-hint">Drag to rotate · scroll to zoom</div>
+      </div>
+    </div>
+
+    <!-- Export / renderer screen -->
+    <div id="export" class="modal-overlay" hidden>
+      <div class="modal-box">
+        <div class="modal-head">
+          <span class="modal-title">Render &amp; download</span>
+          <button id="export-close" class="ghost">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="export-count" id="export-count"></p>
+          <div class="example">
+            <div class="example-stage" id="example-stage"></div>
+            <span class="example-caption" id="example-caption"></span>
+          </div>
+          <label class="field">
+            <span>Resolution</span>
+            <select id="export-res">
+              <option value="128">128 px</option>
+              <option value="256">256 px</option>
+              <option value="512" selected>512 px</option>
+              <option value="1024">1024 px</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Camera</span>
+            <select id="export-camera">
+              <option value="orthographic" selected>Orthographic</option>
+              <option value="perspective">Perspective</option>
+            </select>
+          </label>
+          <div class="field slider-field">
+            <span>Camera distance</span>
+            <input
+              id="export-distance"
+              type="range"
+              min="8"
+              max="48"
+              step="1"
+              value="20"
+            />
+            <output id="export-distance-val">20</output>
+          </div>
+          <div class="field slider-field">
+            <span>Light angle</span>
+            <input
+              id="export-light"
+              type="range"
+              min="0"
+              max="360"
+              step="5"
+              value="0"
+            />
+            <output id="export-light-val">0°</output>
+          </div>
+          <label class="checkfield">
+            <input type="checkbox" id="export-nogui" checked />
+            <span>Render blocks that declare no GUI transform</span>
+          </label>
+          <div class="export-progress" id="export-progress" hidden>
+            <div class="bar"><div class="bar-fill" id="export-bar"></div></div>
+            <span id="export-status"></span>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button id="export-cancel" class="ghost" hidden>Cancel</button>
+          <button id="export-run">Render &amp; download</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

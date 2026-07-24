@@ -1,8 +1,20 @@
 import type * as THREE from 'three';
-import type { WebGLCanvas } from './skia-canvas-webgl.js';
 
 export type UnwrapPromise<T> = T extends PromiseLike<infer U> ? U : T;
 export type UnwrapArray<T> = T extends Array<infer U> ? U : T;
+
+/**
+ * The minimal canvas surface the renderer needs from the host platform. Both
+ * the Node WebGLCanvas (headless-gl + skia-canvas) and a real browser
+ * `<canvas>` satisfy it structurally, so `render.ts` never depends on either.
+ */
+export interface RenderCanvas {
+  width: number;
+  height: number;
+  getContext(type: string, options?: any): any;
+  /** Encodes the current frame to image bytes (PNG by default). */
+  toBuffer(format?: string, options?: any): any;
+}
 
 export type Vector = readonly [number, number, number];
 export type Vector4 = readonly [number, number, number, number];
@@ -78,8 +90,8 @@ export interface Face {
 export interface Renderer {
   scene: THREE.Scene;
   renderer: THREE.WebGLRenderer;
-  canvas: WebGLCanvas;
-  camera: THREE.OrthographicCamera;
+  canvas: RenderCanvas;
+  camera: THREE.OrthographicCamera | THREE.PerspectiveCamera;
   light: THREE.DirectionalLight;
   textureCache: { [key: string]: any };
   animatedCache: { [key: string]: AnimationMeta | null };
@@ -101,6 +113,16 @@ export interface RendererOptions {
   verbose?: number;
   plane?: number;
   animation?: boolean;
+  /**
+   * Camera projection. `orthographic` (default) reproduces the flat in-game
+   * inventory look; `perspective` adds foreshortening.
+   */
+  cameraType?: 'orthographic' | 'perspective';
+  /**
+   * Rotate the key light around the vertical axis, in degrees (default 0).
+   * Shifts which faces catch the light without changing the camera.
+   */
+  lightAngle?: number;
   /** Worker processes for `Minecraft.renderParallel`; defaults to cores - 1. */
   concurrency?: number;
   /**

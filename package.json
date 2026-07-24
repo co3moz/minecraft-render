@@ -1,10 +1,30 @@
 {
   "name": "minecraft-render",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "type": "module",
   "description": "Minecraft gui block/item renderer",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/browser.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "browser": {
+    "./dist/utils/platform.js": "./dist/utils/platform.browser.js",
+    "./dist/utils/jar.js": "./dist/utils/jar.browser.js",
+    "skia-canvas": false,
+    "gl": false,
+    "node-stream-zip": false
+  },
   "scripts": {
     "build": "tsc",
     "test": "nole ./src/**/*.test.ts"
@@ -44,5 +64,9 @@
     "nole": "^3.2.1",
     "prettier": "3.9.5",
     "typescript": "^7.0.2"
+  },
+  "optionalDependencies": {
+    "buffer": "^6.0.3",
+    "fflate": "^0.8.3"
   }
 }

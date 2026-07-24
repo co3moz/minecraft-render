@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { Canvas as SkiaCanvas } from 'skia-canvas';
 import type {
   AnimationMeta,
   BlockModel,
   BlockSides,
   Element,
   Face,
+  RenderCanvas,
   Renderer,
   RendererOptions,
   Transform,
@@ -15,10 +15,11 @@ import type { Minecraft } from './minecraft.js';
 import { distance, invert, mul, size } from './utils/vector-math.js';
 import { Logger } from './utils/logger.js';
 import {
-  createCanvas,
+  createRenderCanvas,
+  createTextureCanvas,
+  destroyRenderContext,
   loadImage,
-  WebGLCanvas,
-} from './utils/skia-canvas-webgl.js';
+} from './utils/platform.js';
 import { makeAnimatedPNG } from './utils/apng.js';
 
 const MATERIAL_FACE_ORDER = [
@@ -32,11 +33,97 @@ const MATERIAL_FACE_ORDER = [
 
 // Vanilla `block/block` inventory transform, used as a fallback for models that
 // declare no `display.gui` when `renderWithoutGui` is enabled.
-const DEFAULT_GUI: Transform = {
+export const DEFAULT_GUI: Transform = {
   rotation: [30, 225, 0],
   translation: [0, 0, 0],
   scale: [0.625, 0.625, 0.625],
 };
+
+/**
+ * The block's inventory (`display.gui`) transform with missing fields filled in
+ * from vanilla defaults. Returns `null` when the block declares none and
+ * `fallbackToDefault` is off; otherwise falls back to {@link DEFAULT_GUI}.
+ */
+export function resolveGuiTransform(
+  block: BlockModel,
+  fallbackToDefault = true,
+): Transform | null {
+  const rawGui =
+    block.display?.gui ?? (fallbackToDefault ? DEFAULT_GUI : undefined);
+  if (!rawGui) return null;
+  return {
+    rotation: rawGui.rotation ?? ([0, 0, 0] as Vector),
+    translation: rawGui.translation ?? ([0, 0, 0] as Vector),
+    scale: rawGui.scale ?? ([1, 1, 1] as Vector),
+  };
+}
+
+/**
+ * Places `camera` at the Minecraft inventory pose derived from `gui` (the exact
+ * math the still renderer uses). Shared with the interactive preview so both
+ * start from the identical view. Works for either projection; the block meshes
+ * are expected to sit unrotated at the origin.
+ */
+export function applyGuiCamera(
+  camera: THREE.OrthographicCamera | THREE.PerspectiveCamera,
+  gui: Transform,
+): void {
+  const D = THREE.MathUtils.DEG2RAD;
+  const stdX = Math.sin((gui.rotation[0] + 195) * D) * 16;
+  const stdY = Math.sin((gui.rotation[0] + 105) * D) * 16;
+  const stdZ = Math.sin((gui.rotation[2] - 45) * D) * 16;
+
+  const yawDiff = (gui.rotation[1] - 135) * D;
+  const cosYaw = Math.cos(yawDiff);
+  const sinYaw = Math.sin(yawDiff);
+
+  const posX = stdX * cosYaw - stdZ * sinYaw;
+  const posY = stdY;
+  const posZ = stdX * sinYaw + stdZ * cosYaw;
+
+  camera.zoom = 1.0 / distance(gui.scale);
+
+  if ((camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
+    // Same view direction, pushed back so perspective foreshortening reads
+    // without cropping the block.
+    const dir = new THREE.Vector3(posX, posY, posZ);
+    if (dir.lengthSq() === 0) dir.set(0, 0, 1);
+    camera.position.copy(dir.setLength(64));
+  } else {
+    camera.position.set(posX, posY, posZ);
+  }
+
+  camera.lookAt(0, 0, 0);
+  camera.position.add(new THREE.Vector3(...gui.translation));
+  camera.updateMatrix();
+  camera.updateProjectionMatrix();
+}
+
+/**
+ * Positions the scene's directional light for a block: side-lit blocks use a
+ * fixed key-light direction, front-lit blocks track the camera. `lightAngle`
+ * (degrees) rotates that direction around the vertical axis. Shared by the still
+ * renderer and the interactive preview so both light a block identically.
+ */
+export function positionGuiLight(
+  light: THREE.DirectionalLight,
+  block: BlockModel,
+  cameraPosition: THREE.Vector3,
+  lightAngle = 0,
+): void {
+  const base =
+    block.gui_light === 'front'
+      ? cameraPosition.clone()
+      : new THREE.Vector3(15, 20, -7);
+  if (lightAngle) {
+    base.applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      lightAngle * THREE.MathUtils.DEG2RAD,
+    );
+  }
+  light.position.copy(base);
+  light.updateMatrix();
+}
 
 export async function prepareRenderer({
   width = 1000,
@@ -47,10 +134,12 @@ export async function prepareRenderer({
   renderWithoutGui = false,
   interpolate = true,
   interpolationSteps = INTERP_SUBFRAMES,
+  cameraType = 'orthographic',
+  lightAngle = 0,
 }: RendererOptions): Promise<Renderer> {
   const scene = new THREE.Scene();
 
-  const canvas: WebGLCanvas = createCanvas(width, height);
+  const canvas: RenderCanvas = createRenderCanvas(width, height);
 
   Logger.debug(
     () =>
@@ -64,7 +153,9 @@ export async function prepareRenderer({
   THREE.ColorManagement.enabled = false;
 
   const renderer = new THREE.WebGLRenderer({
-    canvas,
+    // RenderCanvas is satisfied by both the Node WebGLCanvas and a browser
+    // <canvas>; three's types only accept the DOM canvas union.
+    canvas: canvas as any,
     antialias: true,
     alpha: true,
     logarithmicDepthBuffer: true,
@@ -76,14 +167,17 @@ export async function prepareRenderer({
   renderer.sortObjects = false;
 
   const aspect = width / height;
-  const camera = new THREE.OrthographicCamera(
-    -distance * aspect,
-    distance * aspect,
-    distance,
-    -distance,
-    0.01,
-    20000,
-  );
+  const camera: THREE.OrthographicCamera | THREE.PerspectiveCamera =
+    cameraType === 'perspective'
+      ? new THREE.PerspectiveCamera(30, aspect, 0.01, 20000)
+      : new THREE.OrthographicCamera(
+          -distance * aspect,
+          distance * aspect,
+          distance,
+          -distance,
+          0.01,
+          20000,
+        );
 
   // r155 made physically-correct lighting the default; the legacy model was ~PI
   // brighter for direct/ambient lights. Scale the tuned intensities by PI so the
@@ -153,6 +247,8 @@ export async function prepareRenderer({
       renderWithoutGui,
       interpolate,
       interpolationSteps,
+      cameraType,
+      lightAngle,
     },
   };
 }
@@ -167,9 +263,7 @@ export async function destroyRenderer(renderer: Renderer, immediate = false) {
   }
 
   renderer.renderer.info.reset();
-  (renderer.canvas as any).__gl__
-    .getExtension('STACKGL_destroy_context')
-    .destroy();
+  destroyRenderContext(renderer.canvas);
 
   Logger.debug(() => `Renderer destroyed`);
 }
@@ -207,10 +301,6 @@ export async function render(
 
   Logger.trace(() => `Started rendering ${resultBlock.blockName}`);
 
-  camera.zoom = 1.0 / distance(gui.scale);
-
-  Logger.trace(() => `Camera zoom = ${camera.zoom}`);
-
   // Work out which ticks to actually render (the frames of the animation) and
   // how long each one lasts, instead of rendering one image per game tick.
   const schedule = options.animation
@@ -227,104 +317,30 @@ export async function render(
       Logger.trace(() => `Frame[${block.animationCurrentTick}] started`);
 
       clean.length = 0;
-      let i = 0;
 
-      Logger.trace(() => `Element count = ${block.elements!.length}`);
-
-      for (const element of block.elements!) {
-        Logger.trace(() => `Element[${i}] started rendering`);
-        element.calculatedSize = size(element.from!, element.to!);
-
-        Logger.trace(
-          () => `Element[${i}] geometry = ${element.calculatedSize!.join(',')}`,
-        );
-
-        const geometry = new THREE.BoxGeometry(
-          ...element.calculatedSize,
-          1,
-          1,
-          1,
-        );
-        const cube = new THREE.Mesh(
-          geometry,
-          await constructBlockMaterial(
-            minecraft,
-            block,
-            element,
-            activeRenderer,
-          ),
-        );
-
-        cube.position.set(0, 0, 0);
-        cube.position.add(new THREE.Vector3(...element.from!));
-        cube.position.add(new THREE.Vector3(...element.to!));
-        cube.position.multiplyScalar(0.5);
-        cube.position.add(new THREE.Vector3(-8, -8, -8));
-
-        Logger.trace(
-          () =>
-            `Element[${i}] position set to ${cube.position.toArray().join(',')}`,
-        );
-
-        if (element.rotation) {
-          const origin = mul(element.rotation.origin!, -0.0625);
-          cube.applyMatrix4(
-            new THREE.Matrix4().makeTranslation(...invert(origin)),
-          );
-
-          const angle = THREE.MathUtils.DEG2RAD * element.rotation.angle!;
-
-          if (element.rotation.axis == 'y') {
-            cube.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
-          } else if (element.rotation.axis == 'x') {
-            cube.applyMatrix4(new THREE.Matrix4().makeRotationX(angle));
-          } else if (element.rotation.axis == 'z') {
-            cube.applyMatrix4(new THREE.Matrix4().makeRotationZ(angle));
-          }
-
-          cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin));
-          cube.updateMatrix();
-
-          Logger.trace(() => `Element[${i}] rotation applied`);
-        }
-
-        cube.renderOrder = ++i;
-
+      const meshes = await buildBlockMeshes(
+        minecraft,
+        block,
+        activeRenderer,
+        tick,
+      );
+      for (const cube of meshes) {
         scene.add(cube);
         clean.push(cube);
       }
 
-      const stdX =
-        Math.sin((gui.rotation[0] + 195) * THREE.MathUtils.DEG2RAD) * 16;
-      const stdY =
-        Math.sin((gui.rotation[0] + 105) * THREE.MathUtils.DEG2RAD) * 16;
-      const stdZ =
-        Math.sin((gui.rotation[2] - 45) * THREE.MathUtils.DEG2RAD) * 16;
-
-      const yawDiff = (gui.rotation[1] - 135) * THREE.MathUtils.DEG2RAD;
-      const cosYaw = Math.cos(yawDiff);
-      const sinYaw = Math.sin(yawDiff);
-
-      const posX = stdX * cosYaw - stdZ * sinYaw;
-      const posY = stdY;
-      const posZ = stdX * sinYaw + stdZ * cosYaw;
-
-      camera.position.set(posX, posY, posZ);
-      camera.lookAt(0, 0, 0);
-      camera.position.add(new THREE.Vector3(...gui.translation));
-      camera.updateMatrix();
-      camera.updateProjectionMatrix();
+      applyGuiCamera(camera, gui);
 
       Logger.trace(
         () => `Camera position set ${camera.position.toArray().join(',')}`,
       );
 
-      if (block.gui_light === 'front') {
-        activeRenderer.light.position.copy(camera.position);
-      } else {
-        activeRenderer.light.position.set(15, 20, -7);
-      }
-      activeRenderer.light.updateMatrix();
+      positionGuiLight(
+        activeRenderer.light,
+        block,
+        camera.position,
+        options.lightAngle,
+      );
 
       renderer.render(scene, camera);
 
@@ -364,6 +380,67 @@ export async function render(
   }
 
   return resultBlock;
+}
+
+/**
+ * Builds the three.js meshes for a block's elements at a given animation tick —
+ * baked materials, box geometry, and per-element position/rotation — without
+ * adding them to any scene. Shared by the batch {@link render} pipeline and the
+ * interactive `createBlockPreview` so both produce identical geometry.
+ *
+ * `renderer` only needs to carry `textureCache`, `animatedCache` and `options`
+ * (used for material baking); the preview passes a lightweight stand-in rather
+ * than a full GL renderer.
+ */
+export async function buildBlockMeshes(
+  minecraft: Minecraft,
+  block: BlockModel,
+  renderer: Renderer,
+  tick = 0,
+): Promise<THREE.Mesh[]> {
+  block.animationCurrentTick = tick;
+
+  const meshes: THREE.Mesh[] = [];
+  let i = 0;
+
+  for (const element of block.elements ?? []) {
+    element.calculatedSize = size(element.from!, element.to!);
+
+    const geometry = new THREE.BoxGeometry(...element.calculatedSize, 1, 1, 1);
+    const cube = new THREE.Mesh(
+      geometry,
+      await constructBlockMaterial(minecraft, block, element, renderer),
+    );
+
+    cube.position.set(0, 0, 0);
+    cube.position.add(new THREE.Vector3(...element.from!));
+    cube.position.add(new THREE.Vector3(...element.to!));
+    cube.position.multiplyScalar(0.5);
+    cube.position.add(new THREE.Vector3(-8, -8, -8));
+
+    if (element.rotation) {
+      const origin = mul(element.rotation.origin!, -0.0625);
+      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...invert(origin)));
+
+      const angle = THREE.MathUtils.DEG2RAD * element.rotation.angle!;
+
+      if (element.rotation.axis == 'y') {
+        cube.applyMatrix4(new THREE.Matrix4().makeRotationY(angle));
+      } else if (element.rotation.axis == 'x') {
+        cube.applyMatrix4(new THREE.Matrix4().makeRotationX(angle));
+      } else if (element.rotation.axis == 'z') {
+        cube.applyMatrix4(new THREE.Matrix4().makeRotationZ(angle));
+      }
+
+      cube.applyMatrix4(new THREE.Matrix4().makeTranslation(...origin));
+      cube.updateMatrix();
+    }
+
+    cube.renderOrder = ++i;
+    meshes.push(cube);
+  }
+
+  return meshes;
 }
 
 type FrameStep = { index: number; time: number };
@@ -592,7 +669,7 @@ async function constructTextureMaterial(
     return cache[materialCacheKey];
   }
 
-  const canvas = new SkiaCanvas(width, height);
+  const canvas = createTextureCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
   ctx.imageSmoothingEnabled = false;

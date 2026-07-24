@@ -3,7 +3,7 @@
     "target": "es2017",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["es2017", "esnext"],
+    "lib": ["es2017", "esnext", "dom", "dom.iterable"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

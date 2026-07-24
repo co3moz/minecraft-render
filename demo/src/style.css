@@ -1,0 +1,499 @@
+:root {
+  --bg: #12151b;
+  --panel: #1b1f28;
+  --panel-2: #232834;
+  --border: #313848;
+  --text: #e6e9ef;
+  --muted: #8b93a7;
+  --accent: #5aa9e6;
+  --accent-2: #7ee081;
+  --danger: #e06a6a;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(1200px 600px at 50% -10%, #1c2230 0%, var(--bg) 60%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.5px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.tagline {
+  color: var(--muted);
+  max-width: 620px;
+  line-height: 1.5;
+}
+
+code {
+  background: var(--panel-2);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.9em;
+}
+
+/* Dropzone ---------------------------------------------------------------- */
+.dropzone {
+  margin-top: 24px;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+}
+.dropzone:hover {
+  border-color: var(--accent);
+}
+.dropzone.dragging {
+  border-color: var(--accent-2);
+  background: #1e2530;
+  transform: scale(1.005);
+}
+.dropzone-inner {
+  padding: 56px 24px;
+  text-align: center;
+}
+.drop-icon {
+  font-size: 40px;
+  color: var(--accent);
+  animation: bob 2s ease-in-out infinite;
+}
+@keyframes bob {
+  50% {
+    transform: translateY(6px);
+  }
+}
+.dropzone p {
+  margin: 10px 0 0;
+}
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Controls ---------------------------------------------------------------- */
+.controls {
+  margin-top: 20px;
+}
+.jar-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.pill {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.pill b {
+  color: var(--text);
+}
+.control-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#search {
+  flex: 1;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 14px;
+}
+#search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.size-label {
+  color: var(--muted);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 10px;
+}
+button {
+  background: var(--accent);
+  color: #0b1017;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: filter 0.12s, opacity 0.12s;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.status {
+  color: var(--muted);
+  font-size: 13px;
+  flex: 1;
+}
+.card {
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.05s;
+}
+.card:hover {
+  border-color: var(--accent);
+}
+.card:active {
+  transform: scale(0.98);
+}
+
+/* Live preview overlay ---------------------------------------------------- */
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 10, 14, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+/* `display: flex` above would otherwise beat the UA `[hidden]` rule, leaving the
+   modal on screen (and the close button apparently dead). */
+.preview-overlay[hidden] {
+  display: none;
+}
+.preview-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: min(520px, 92vw);
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.preview-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.preview-name {
+  flex: 1;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.spin-toggle input {
+  accent-color: var(--accent);
+}
+.preview-head .ghost {
+  padding: 6px 12px;
+}
+.preview-stage {
+  aspect-ratio: 1;
+  background: repeating-conic-gradient(#1a1e27 0% 25%, #171b23 0% 50%) 50% / 24px
+    24px;
+}
+.preview-stage canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+.preview-stage canvas:active {
+  cursor: grabbing;
+}
+.preview-hint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* Grid -------------------------------------------------------------------- */
+.grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* `display: flex` above would otherwise beat the UA `[hidden]` rule. */
+.card[hidden] {
+  display: none;
+}
+.card.rendered {
+  border-color: #2f4738;
+}
+.card.skipped {
+  opacity: 0.6;
+}
+.thumb {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-conic-gradient(#1a1e27 0% 25%, #171b23 0% 50%) 50% / 20px
+    20px;
+}
+.hover-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+}
+/* While the live spinning canvas is mounted, hide the static thumbnail beneath
+   it so the two don't show through each other. */
+.thumb.spinning img,
+.thumb.spinning .placeholder,
+.thumb.spinning .skip {
+  visibility: hidden;
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.placeholder {
+  color: #39404f;
+  font-size: 28px;
+}
+.skip {
+  color: var(--danger);
+  font-size: 11px;
+  text-align: center;
+  padding: 0 8px;
+  word-break: break-word;
+}
+.label {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-top: 1px solid var(--border);
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+/* Small secondary button -------------------------------------------------- */
+button.small {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+button.small:hover:not(:disabled) {
+  border-color: var(--accent);
+  filter: none;
+}
+
+/* Export / renderer modal ------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 10, 14, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+.modal-overlay[hidden] {
+  display: none;
+}
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: min(440px, 92vw);
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title {
+  flex: 1;
+  font-weight: 600;
+}
+.modal-body {
+  padding: 16px 16px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.export-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.field select,
+.field input {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 10px;
+  width: 130px;
+}
+.checkfield {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.checkfield input {
+  accent-color: var(--accent);
+  margin-top: 2px;
+}
+.export-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.bar {
+  flex: 1;
+  height: 6px;
+  background: var(--panel-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 0.15s;
+}
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+/* Export live example ----------------------------------------------------- */
+.example {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.example-stage {
+  width: 100%;
+  height: 190px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: repeating-conic-gradient(#1a1e27 0% 25%, #171b23 0% 50%) 50% / 22px
+    22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.example-stage canvas {
+  height: 100%;
+  aspect-ratio: 1;
+  display: block;
+}
+.example-caption {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+/* Slider rows */
+.slider-field {
+  gap: 10px;
+}
+.slider-field > span {
+  flex: 0 0 auto;
+}
+.slider-field input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+.slider-field output {
+  flex: 0 0 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 13px;
+}

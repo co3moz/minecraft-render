@@ -47,7 +47,9 @@ export interface LoggerCallback {
 }
 
 function getLevelFromEnv(): number | undefined {
-  const envVal = process.env.LOGGER_LEVEL;
+  // `process` is absent in the browser; the logger must load there too.
+  const envVal =
+    typeof process !== 'undefined' ? process.env?.LOGGER_LEVEL : undefined;
   if (envVal && envVal in CATEGORIES) {
     return CATEGORIES[envVal as keyof typeof CATEGORIES];
   }

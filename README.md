@@ -34,6 +34,8 @@ Options:
   -w, --width [width]        output image width (default: 1000)
   -t, --height [height]      output image height (default: 1000)
   -d, --distance [distance]  distance between camera and block (default: 20)
+  -c, --camera <type>        camera projection: orthographic (default) or perspective
+  -l, --light-angle <deg>    rotate the key light around the vertical axis (default: 0)
   -v, --verbose              increases logging level (default: 3)
   -p, --plane                debugging plane and axis (default: 0)
   -A, --no-animation         disables apng generation
