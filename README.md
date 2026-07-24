@@ -17,7 +17,7 @@ Browse them here: [minecraft-render wiki](https://github.com/co3moz/minecraft-re
 
 ### Try it in your browser
 
-Those galleries are pre-rendered — want to test it with your **own** jar? The
+Those galleries are pre-rendered, want to test it with your **own** jar? The
 renderer also runs entirely client-side, on your browser's GPU:
 
 **[co3moz.github.io/minecraft-render](https://co3moz.github.io/minecraft-render/)**
@@ -104,14 +104,14 @@ async function main() {
 
 ### Mod support
 
-[![Rendered image - from create mod](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/experience_block.png)](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/experience_block.png)
+[![Rendered image, from create mod](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/experience_block.png)](https://raw.githubusercontent.com/co3moz/minecraft-render/master/docs/experience_block.png)
 
 Mod jars work alongside vanilla jars. Assets are resolved by **namespace**
 (`minecraft:`, `travelersbackpack:`, …) instead of assuming `minecraft`, and the
 mod's namespace is auto-detected from the jar.
 
 Mod models usually reference vanilla assets (`minecraft:block/…`), so a mod jar
-alone is not enough — the matching vanilla jar is used as a fallback. Provide it
+alone is not enough, the matching vanilla jar is used as a fallback. Provide it
 yourself, or let minecraft-render resolve and download it:
 
 ```sh
@@ -140,7 +140,7 @@ Notes:
 
 - Loaders detected: Fabric (`fabric.mod.json`), Forge/NeoForge (`mods.toml`), vanilla (`version.json`).
 - `texture_size` (Blockbench / hi-res atlases) is honored.
-- Models that use a custom loader (e.g. Fabric's `fabric:type`) can't be rendered — their geometry lives in the mod's code, so they are skipped.
+- Models that use a custom loader (e.g. Fabric's `fabric:type`) can't be rendered, their geometry lives in the mod's code, so they are skipped.
 - If a model references another mod's namespace that isn't loaded, the block is skipped with a message suggesting the jar to add (`--merge <namespace>.<version>.jar`).
 
 ### Parallel rendering
@@ -163,7 +163,7 @@ for await (const { blockName, buffer, skip } of mc.renderParallel(names, {
 ```
 
 `renderParallel` always uses worker processes (even at `concurrency: 1`), and a
-worker is **recycled** — its process is restarted — every `RECYCLE_EVERY` blocks.
+worker is **recycled**, its process is restarted, every `RECYCLE_EVERY` blocks.
 `headless-gl` never returns its native memory to the OS, so process exit is the
 only thing that reclaims it; recycling keeps memory and per-block time flat over
 long runs.

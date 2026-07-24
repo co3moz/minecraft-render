@@ -497,3 +497,33 @@ button.small:hover:not(:disabled) {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* Vanilla version picker -------------------------------------------------- */
+.vanilla {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+}
+/* `display: flex` above would otherwise beat the UA `[hidden]` rule, showing an
+   empty picker before (or when) the manifest fails to load. */
+.vanilla[hidden] {
+  display: none;
+}
+.vanilla-status {
+  color: var(--muted);
+  font-size: 14px;
+}
+.vanilla-status.error {
+  color: var(--danger);
+}
+.vanilla-picker {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.vanilla-picker select {
+  max-width: 220px;
+}

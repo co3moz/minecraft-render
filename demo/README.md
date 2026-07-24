@@ -1,7 +1,7 @@
 # minecraft-render · browser demo
 
 A [Vite](https://vitejs.dev/) app that renders Minecraft blocks **entirely in the
-browser** — drag & drop a `.jar`, and blocks are rendered on your GPU using the
+browser**, drag and drop a `.jar`, and blocks are rendered on your GPU using the
 same renderer that powers the `minecraft-render` Node library.
 
 ## How it reuses the library
@@ -25,12 +25,12 @@ import { Minecraft, Jar, render, createBlockPreview } from 'minecraft-render';
 const jar = await Jar.fromBlob(file); // browser-only helper
 const mc = Minecraft.open([modJar, vanillaJar]);
 
-// Still thumbnails — bake a block to PNG bytes and show as an <img>.
+// Still thumbnails, bake a block to PNG bytes and show as an <img>.
 await mc.prepareRenderEnvironment({ width: 128, height: 128 });
 const result = await render(mc, await mc.getModel('brass_encased_cogwheel'));
 // result.buffer is PNG bytes
 
-// Live, rotatable preview on a <canvas> — drag to orbit, wheel to zoom.
+// Live, rotatable preview on a <canvas>, drag to orbit, wheel to zoom.
 const preview = await createBlockPreview(canvas, mc, model, { autoRotate: true });
 preview.setAutoRotate(false);
 preview.dispose();
@@ -52,19 +52,21 @@ npm run dev
 ```
 
 Then open the printed URL and drop a jar. Drop a mod jar **together with the
-matching vanilla `minecraft.jar`** so parent models and textures resolve; blocks
-whose assets can't be found are shown as skipped with the reason.
+matching vanilla `minecraft.jar`** so parent models and textures resolve, blocks
+whose assets can't be found are shown as skipped with the reason. If the version
+manifest is reachable, a picker also lets you load a vanilla version directly, no
+manual download needed.
 
-- **Thumbnails render on demand** — each block bakes to a 256 px still as its
+- **Thumbnails render on demand**, each block bakes to a 256 px still as its
   card scrolls into view. **Hover** a card to spin it live in 3D.
-- **Click any block** for a full rotatable preview: drag to rotate, scroll to
+- **Click any block** for a full rotatable preview, drag to rotate, scroll to
   zoom, toggle **Spin**. Its **Download rendered** button opens the export
   screen for that block.
-- **Render all → download** exports every listed (filtered) block from the
+- **Render all, download** exports every listed (filtered) block from the
   default inventory pose (spin is ignored). The export dialog shows a **live
   example** of the first block that updates as you change resolution, camera
   (orthographic/perspective), camera distance, or **light angle**. One block
-  downloads as `name.png`; many are bundled into a single `renders.zip`.
+  downloads as `name.png`, many are bundled into a single `renders.zip`.
 
 > `Minecraft.forMod` (auto-downloads the vanilla jar) and `renderParallel`
 > (worker processes) are Node-only and not available in the browser build.

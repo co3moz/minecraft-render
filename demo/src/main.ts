@@ -22,6 +22,15 @@ const THUMB_SIZE = 256;
 // ---------------------------------------------------------------------------
 const dropzone = document.getElementById('dropzone') as HTMLElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
+const vanillaPanel = document.getElementById('vanilla') as HTMLElement;
+const vanillaStatus = document.getElementById('vanilla-status') as HTMLElement;
+const vanillaPicker = document.getElementById('vanilla-picker') as HTMLElement;
+const versionSelect = document.getElementById(
+  'version-select',
+) as HTMLSelectElement;
+const versionLoad = document.getElementById(
+  'version-load',
+) as HTMLButtonElement;
 const controls = document.getElementById('controls') as HTMLElement;
 const jarInfo = document.getElementById('jar-info') as HTMLElement;
 const search = document.getElementById('search') as HTMLInputElement;
@@ -37,7 +46,9 @@ const spinToggle = document.getElementById('spin') as HTMLInputElement;
 const previewDownload = document.getElementById(
   'preview-download',
 ) as HTMLButtonElement;
-const previewClose = document.getElementById('preview-close') as HTMLButtonElement;
+const previewClose = document.getElementById(
+  'preview-close',
+) as HTMLButtonElement;
 
 const exportOverlay = document.getElementById('export') as HTMLElement;
 const exportCount = document.getElementById('export-count') as HTMLElement;
@@ -60,12 +71,18 @@ const exampleStage = document.getElementById('example-stage') as HTMLElement;
 const exampleCaption = document.getElementById(
   'example-caption',
 ) as HTMLElement;
-const exportProgress = document.getElementById('export-progress') as HTMLElement;
+const exportProgress = document.getElementById(
+  'export-progress',
+) as HTMLElement;
 const exportBar = document.getElementById('export-bar') as HTMLElement;
 const exportStatus = document.getElementById('export-status') as HTMLElement;
 const exportRun = document.getElementById('export-run') as HTMLButtonElement;
-const exportCancelBtn = document.getElementById('export-cancel') as HTMLButtonElement;
-const exportCloseBtn = document.getElementById('export-close') as HTMLButtonElement;
+const exportCancelBtn = document.getElementById(
+  'export-cancel',
+) as HTMLButtonElement;
+const exportCloseBtn = document.getElementById(
+  'export-close',
+) as HTMLButtonElement;
 
 // ---------------------------------------------------------------------------
 // State
@@ -146,32 +163,167 @@ async function loadJars(files: File[]) {
     // first jar carrying block models decides the namespace to enumerate — so a
     // mod jar should win over the vanilla fallback beside it.
     const ordered = [...files].sort((a, b) => a.size - b.size);
-    loadedJars = await Promise.all(ordered.map((f) => Jar.fromBlob(f)));
-
-    minecraft = Minecraft.open(loadedJars);
-    const ns = await minecraft.namespace();
-    const names = (await minecraft.getBlockNameList()).sort();
-
-    const info = await minecraft.inspect().catch(() => null);
-    jarInfo.innerHTML =
-      `<span class="pill">${files.map((f) => f.name).join(', ')}</span>` +
-      `<span class="pill">namespace: <b>${ns}</b></span>` +
-      (info?.loader ? `<span class="pill">loader: ${info.loader}</span>` : '') +
-      `<span class="pill">${names.length} blocks</span>`;
-
-    dropzone.hidden = true;
-    controls.hidden = false;
-
-    await ensureRenderer();
-    buildCards(names);
-    applyFilter();
-    statusEl.textContent = '';
+    const jars = await Promise.all(ordered.map((f) => Jar.fromBlob(f)));
+    await openJars(
+      jars,
+      ordered.map((f) => f.name),
+    );
   } catch (err: any) {
     statusEl.textContent = '';
-    alert(`Failed to read jar: ${err?.message ?? err}`);
+    alert(formatError(err));
     console.error(err);
   }
 }
+
+// Shared entry once jars are in hand (from drag & drop or a fetched vanilla
+// version): open them, enumerate blocks, and switch to the grid.
+async function openJars(jars: Jar[], names: string[]) {
+  loadedJars = jars;
+  minecraft = Minecraft.open(jars);
+  const ns = await minecraft.namespace();
+  const blockNames = (await minecraft.getBlockNameList()).sort();
+
+  const info = await minecraft.inspect().catch(() => null);
+  jarInfo.innerHTML =
+    `<span class="pill">${names.join(', ')}</span>` +
+    `<span class="pill">namespace: <b>${ns}</b></span>` +
+    (info?.loader ? `<span class="pill">loader: ${info.loader}</span>` : '') +
+    `<span class="pill">${blockNames.length} blocks</span>`;
+
+  dropzone.hidden = true;
+  vanillaPanel.hidden = true;
+  controls.hidden = false;
+
+  await ensureRenderer();
+  buildCards(blockNames);
+  applyFilter();
+  statusEl.textContent = '';
+}
+
+function formatError(err: any): string {
+  return `Operation failed. Reason: ${err?.message ?? String(err)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Vanilla versions (fetched through a CORS proxy, no download needed)
+// ---------------------------------------------------------------------------
+const MANIFEST_URL =
+  'https://launchermeta.mojang.com/mc/game/version_manifest.json';
+
+const corsUrl = (url: string) =>
+  'https://corsproxy.io?' + encodeURIComponent(url);
+
+async function proxiedFetch(url: string): Promise<Response> {
+  const proxied = await fetch(corsUrl(url));
+  if (!proxied.ok) throw new Error(`request failed (HTTP ${proxied.status})`);
+  return proxied;
+}
+
+async function fetchJson(url: string): Promise<any> {
+  return (await proxiedFetch(url)).json();
+}
+
+async function fetchBytes(
+  url: string,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<Uint8Array> {
+  const res = await proxiedFetch(url);
+  const total = Number(res.headers.get('content-length')) || 0;
+  if (!res.body) return new Uint8Array(await res.arrayBuffer());
+
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onProgress?.(loaded, total);
+  }
+  const out = new Uint8Array(loaded);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+async function initVanilla() {
+  // Keep the whole section hidden until the manifest is confirmed reachable, so
+  // a blocked request never leaves a dead control on screen misleading users.
+  try {
+    const manifest = await fetchJson(MANIFEST_URL);
+    const latest: string | undefined = manifest.latest?.release;
+    const releases: { id: string; url: string }[] = (
+      manifest.versions ?? []
+    ).filter((v: any) => v.type === 'release');
+
+    if (!releases.length) throw new Error('no releases in the manifest');
+
+    versionSelect.innerHTML = '';
+    for (const v of releases) {
+      const opt = document.createElement('option');
+      opt.value = v.url;
+      opt.dataset.versionId = v.id;
+      opt.textContent = v.id === latest ? `${v.id} (latest)` : v.id;
+      if (v.id === latest) opt.selected = true;
+      versionSelect.appendChild(opt);
+    }
+
+    vanillaStatus.textContent = 'No jar? Load a vanilla version directly:';
+    vanillaPicker.hidden = false;
+    vanillaPanel.hidden = false;
+  } catch (err) {
+    // Manifest unavailable (proxy/CORS blocked, offline, …): stay hidden.
+    console.error('Minecraft version manifest unavailable:', err);
+  }
+}
+
+async function loadVanilla(versionUrl: string, versionId: string) {
+  versionLoad.disabled = true;
+  versionSelect.disabled = true;
+  vanillaStatus.classList.remove('error');
+  try {
+    vanillaStatus.textContent = `Fetching Minecraft ${versionId} metadata…`;
+    const meta = await fetchJson(versionUrl);
+    const jarUrl: string | undefined = meta?.downloads?.client?.url;
+    if (!jarUrl) {
+      throw new Error(`no client jar is listed for Minecraft ${versionId}`);
+    }
+
+    const bytes = await fetchBytes(jarUrl, (loaded, total) => {
+      const mb = (loaded / 1e6).toFixed(1);
+      vanillaStatus.textContent = total
+        ? `Downloading Minecraft ${versionId}… ${mb} / ${(total / 1e6).toFixed(1)} MB`
+        : `Downloading Minecraft ${versionId}… ${mb} MB`;
+    });
+
+    vanillaStatus.textContent = `Reading Minecraft ${versionId}…`;
+    const jar = Jar.fromBytes(`minecraft-${versionId}.jar`, bytes);
+    await openJars([jar], [`minecraft-${versionId}.jar`]);
+  } catch (err) {
+    showVanillaError(err);
+    versionLoad.disabled = false;
+    versionSelect.disabled = false;
+  }
+}
+
+function showVanillaError(err: any) {
+  vanillaPanel.hidden = false;
+  vanillaPicker.hidden = false;
+  vanillaStatus.classList.add('error');
+  vanillaStatus.textContent = formatError(err);
+  console.error(err);
+}
+
+versionLoad.addEventListener('click', () => {
+  const opt = versionSelect.selectedOptions[0];
+  if (opt) loadVanilla(opt.value, opt.dataset.versionId || 'unknown');
+});
+
+initVanilla();
 
 async function ensureRenderer() {
   if (!minecraft) return;
