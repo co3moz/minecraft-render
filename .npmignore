@@ -5,3 +5,7 @@ test-data
 .github
 scripts
 demo
+.claude
+.prettierignore
+.prettierrc
+tsconfig.json
