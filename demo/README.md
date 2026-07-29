@@ -51,11 +51,13 @@ npm install
 npm run dev
 ```
 
-Then open the printed URL and drop a jar. Drop a mod jar **together with the
-matching vanilla `minecraft.jar`** so parent models and textures resolve, blocks
-whose assets can't be found are shown as skipped with the reason. If the version
-manifest is reachable, a picker also lets you load a vanilla version directly, no
-manual download needed.
+Then open the printed URL and drop a jar. A mod jar needs the matching vanilla
+`minecraft.jar` for its parent models and textures to resolve, so when you drop
+one on its own the demo reads the Minecraft version the mod declares and, if the
+version manifest is reachable, fetches that client jar for you. Dropping the
+vanilla jar yourself skips the download, and blocks whose assets still can't be
+found are shown as skipped with the reason. When the manifest is reachable a
+picker also lets you load a vanilla version directly, no manual download needed.
 
 - **Thumbnails render on demand**, each block bakes to a 256 px still as its
   card scrolls into view. **Hover** a card to spin it live in 3D.

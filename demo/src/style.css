@@ -171,6 +171,9 @@ button.ghost {
   font-size: 13px;
   flex: 1;
 }
+.status.warn {
+  color: var(--danger);
+}
 .card {
   cursor: pointer;
   transition: border-color 0.12s, transform 0.05s;

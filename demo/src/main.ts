@@ -9,6 +9,7 @@ import {
   Jar,
   render,
   createBlockPreview,
+  inspectJar,
   type BlockModel,
   type BlockPreview,
 } from 'minecraft-render';
@@ -164,10 +165,19 @@ async function loadJars(files: File[]) {
     // mod jar should win over the vanilla fallback beside it.
     const ordered = [...files].sort((a, b) => a.size - b.size);
     const jars = await Promise.all(ordered.map((f) => Jar.fromBlob(f)));
-    await openJars(
-      jars,
-      ordered.map((f) => f.name),
-    );
+    const names = ordered.map((f) => f.name);
+
+    const auto = await autoVanillaJar(jars);
+    if (auto && 'jar' in auto) {
+      jars.push(auto.jar);
+      names.push(auto.name);
+    }
+
+    await openJars(jars, names);
+    if (auto && 'warning' in auto) {
+      statusEl.classList.add('warn');
+      statusEl.textContent = auto.warning;
+    }
   } catch (err: any) {
     statusEl.textContent = '';
     alert(formatError(err));
@@ -209,6 +219,16 @@ function formatError(err: any): string {
 // ---------------------------------------------------------------------------
 const MANIFEST_URL =
   'https://launchermeta.mojang.com/mc/game/version_manifest.json';
+
+interface VersionRef {
+  id: string;
+  url: string;
+}
+
+// Every published version from the manifest (not just the releases offered in
+// the picker), kept so a mod's declared Minecraft requirement can be resolved
+// without fetching the manifest a second time. Empty when it was unreachable.
+let manifestVersions: (VersionRef & { type: string })[] = [];
 
 const corsUrl = (url: string) =>
   'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
@@ -263,11 +283,14 @@ async function initVanilla() {
   try {
     const manifest = await fetchJson(MANIFEST_URL);
     const latest: string | undefined = manifest.latest?.release;
-    const releases: { id: string; url: string }[] = (
-      manifest.versions ?? []
-    ).filter((v: any) => v.type === 'release');
+    const versions = manifest.versions ?? [];
+    const releases: VersionRef[] = versions.filter(
+      (v: any) => v.type === 'release',
+    );
 
     if (!releases.length) throw new Error('no releases in the manifest');
+
+    manifestVersions = versions;
 
     versionSelect.innerHTML = '';
     for (const v of releases) {
@@ -288,30 +311,119 @@ async function initVanilla() {
   }
 }
 
+// Downloads a version's client jar, reporting progress through `onStatus`.
+async function fetchVanillaJar(
+  version: VersionRef,
+  onStatus: (message: string) => void,
+): Promise<Jar> {
+  onStatus(`Fetching Minecraft ${version.id} metadata…`);
+  const meta = await fetchJson(version.url);
+  const jarUrl: string | undefined = meta?.downloads?.client?.url;
+  if (!jarUrl) {
+    throw new Error(`no client jar is listed for Minecraft ${version.id}`);
+  }
+
+  const bytes = await fetchBytes(jarUrl, (loaded, total) => {
+    const mb = (loaded / 1e6).toFixed(1);
+    onStatus(
+      total
+        ? `Downloading Minecraft ${version.id}… ${mb} / ${(total / 1e6).toFixed(1)} MB`
+        : `Downloading Minecraft ${version.id}… ${mb} MB`,
+    );
+  });
+
+  onStatus(`Reading Minecraft ${version.id}…`);
+  return Jar.fromBytes(vanillaJarName(version.id), bytes);
+}
+
+const vanillaJarName = (id: string) => `minecraft-${id}.jar`;
+
 async function loadVanilla(versionUrl: string, versionId: string) {
   versionLoad.disabled = true;
   versionSelect.disabled = true;
   vanillaStatus.classList.remove('error');
   try {
-    vanillaStatus.textContent = `Fetching Minecraft ${versionId} metadata…`;
-    const meta = await fetchJson(versionUrl);
-    const jarUrl: string | undefined = meta?.downloads?.client?.url;
-    if (!jarUrl) {
-      throw new Error(`no client jar is listed for Minecraft ${versionId}`);
-    }
-
-    const bytes = await fetchBytes(jarUrl, (loaded, total) => {
-      const mb = (loaded / 1e6).toFixed(1);
-      vanillaStatus.textContent = total
-        ? `Downloading Minecraft ${versionId}… ${mb} / ${(total / 1e6).toFixed(1)} MB`
-        : `Downloading Minecraft ${versionId}… ${mb} MB`;
-    });
-
-    vanillaStatus.textContent = `Reading Minecraft ${versionId}…`;
-    const jar = Jar.fromBytes(`minecraft-${versionId}.jar`, bytes);
-    await openJars([jar], [`minecraft-${versionId}.jar`]);
+    const version = { id: versionId, url: versionUrl };
+    const jar = await fetchVanillaJar(
+      version,
+      (message) => (vanillaStatus.textContent = message),
+    );
+    await openJars([jar], [vanillaJarName(versionId)]);
   } catch (err) {
     showVanillaError(err);
+    versionLoad.disabled = false;
+    versionSelect.disabled = false;
+  }
+}
+
+/**
+ * Resolves a mod's Minecraft requirement (an exact id like `1.21.1`, or a range
+ * like `~1.21` / `>=1.20` / `[1.20,)`) against the manifest, mirroring the
+ * library's Node-side resolver: prefer an exact id, then the newest release
+ * sharing the requirement's base version.
+ */
+function resolveVersion(requirement: string): VersionRef | null {
+  const base = requirement.match(/\d+(?:\.\d+)*/)?.[0] ?? requirement;
+  const matches = (id: string) => id === base || id.startsWith(`${base}.`);
+
+  const exact = manifestVersions.find((v) => v.id === base);
+  const release = manifestVersions.find(
+    (v) => v.type === 'release' && matches(v.id),
+  );
+  const any = manifestVersions.find((v) => matches(v.id));
+  const chosen = exact ?? release ?? any;
+
+  return chosen ? { id: chosen.id, url: chosen.url } : null;
+}
+
+/**
+ * A mod jar on its own can't resolve the vanilla parent models and textures it
+ * references, so every block skips. When the drop carries no vanilla jar but a
+ * mod declares which Minecraft version it needs — and the manifest reached us —
+ * fetch that client jar once and append it as the fallback source.
+ *
+ * Best-effort: a failure here returns a warning instead of throwing, so the mod
+ * still opens exactly as it did before (blocks needing vanilla assets skip).
+ */
+async function autoVanillaJar(
+  jars: Jar[],
+): Promise<{ jar: Jar; name: string } | { warning: string } | null> {
+  await vanillaReady;
+  if (!manifestVersions.length) return null;
+
+  const infos = await Promise.all(
+    jars.map((jar) => inspectJar(jar).catch(() => null)),
+  );
+  // A vanilla jar was dropped alongside the mod: nothing to fetch.
+  if (infos.some((info) => info?.loader === 'vanilla')) return null;
+
+  const requirement = infos.find((info) => info?.minecraft)?.minecraft;
+  if (!requirement) return null;
+
+  const version = resolveVersion(requirement);
+  if (!version) {
+    return {
+      warning: `Couldn't match the required Minecraft "${requirement}" to a published version, vanilla assets may be missing.`,
+    };
+  }
+
+  vanillaPanel.hidden = false;
+  vanillaPicker.hidden = false;
+  vanillaStatus.classList.remove('error');
+  versionLoad.disabled = true;
+  versionSelect.disabled = true;
+  try {
+    const jar = await fetchVanillaJar(
+      version,
+      (message) => (vanillaStatus.textContent = message),
+    );
+    return { jar, name: vanillaJarName(version.id) };
+  } catch (err: any) {
+    console.error(`Auto-loading Minecraft ${version.id} failed:`, err);
+    return {
+      warning: `Minecraft ${version.id} couldn't be loaded automatically (${err?.message ?? err}), vanilla assets may be missing.`,
+    };
+  } finally {
     versionLoad.disabled = false;
     versionSelect.disabled = false;
   }
@@ -330,7 +442,9 @@ versionLoad.addEventListener('click', () => {
   if (opt) loadVanilla(opt.value, opt.dataset.versionId || 'unknown');
 });
 
-initVanilla();
+// Kept as a promise so a jar dropped before the manifest lands can still wait
+// for it (and auto-load its vanilla dependency) instead of silently giving up.
+const vanillaReady = initVanilla();
 
 async function ensureRenderer() {
   if (!minecraft) return;
