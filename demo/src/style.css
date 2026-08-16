@@ -526,7 +526,18 @@ button.small:hover:not(:disabled) {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 .vanilla-picker select {
   max-width: 220px;
+}
+/* `.checkfield` is tuned for the export dialog, where a wrapping label sits
+   under a field; on this single line it belongs centred beside the button. */
+.vanilla-picker .checkfield {
+  align-items: center;
+  white-space: nowrap;
+}
+.vanilla-picker .checkfield input {
+  margin-top: 0;
 }

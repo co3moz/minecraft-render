@@ -32,6 +32,9 @@ const versionSelect = document.getElementById(
 const versionLoad = document.getElementById(
   'version-load',
 ) as HTMLButtonElement;
+const versionSnapshots = document.getElementById(
+  'version-snapshots',
+) as HTMLInputElement;
 const controls = document.getElementById('controls') as HTMLElement;
 const jarInfo = document.getElementById('jar-info') as HTMLElement;
 const search = document.getElementById('search') as HTMLInputElement;
@@ -225,10 +228,13 @@ interface VersionRef {
   url: string;
 }
 
-// Every published version from the manifest (not just the releases offered in
-// the picker), kept so a mod's declared Minecraft requirement can be resolved
-// without fetching the manifest a second time. Empty when it was unreachable.
+// Every published version from the manifest (releases, snapshots, pre-releases
+// and the old alphas/betas), kept so a mod's declared Minecraft requirement can
+// be resolved without fetching the manifest a second time, and so the picker can
+// switch between releases and everything without refetching. Empty when the
+// manifest was unreachable.
 let manifestVersions: (VersionRef & { type: string })[] = [];
+let latestRelease: string | undefined;
 
 const corsUrl = (url: string) =>
   'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
@@ -277,30 +283,43 @@ async function fetchBytes(
   return out;
 }
 
+/**
+ * Fills the picker from the manifest: releases only, or every published version
+ * when "Include snapshots" is ticked. The current pick stays selected as long as
+ * it survives the filter, otherwise the select falls back to its first option,
+ * which is the newest version the manifest lists.
+ */
+function populateVersions() {
+  const previous = versionSelect.selectedOptions[0]?.dataset.versionId;
+  const shown = versionSnapshots.checked
+    ? manifestVersions
+    : manifestVersions.filter((v) => v.type === 'release');
+
+  versionSelect.innerHTML = '';
+  for (const v of shown) {
+    const opt = document.createElement('option');
+    opt.value = v.url;
+    opt.dataset.versionId = v.id;
+    opt.textContent = v.id === latestRelease ? `${v.id} (latest)` : v.id;
+    if (v.id === (previous ?? latestRelease)) opt.selected = true;
+    versionSelect.appendChild(opt);
+  }
+}
+
 async function initVanilla() {
   // Keep the whole section hidden until the manifest is confirmed reachable, so
   // a blocked request never leaves a dead control on screen misleading users.
   try {
     const manifest = await fetchJson(MANIFEST_URL);
-    const latest: string | undefined = manifest.latest?.release;
+    latestRelease = manifest.latest?.release;
     const versions = manifest.versions ?? [];
-    const releases: VersionRef[] = versions.filter(
-      (v: any) => v.type === 'release',
-    );
 
-    if (!releases.length) throw new Error('no releases in the manifest');
+    if (!versions.some((v: any) => v.type === 'release')) {
+      throw new Error('no releases in the manifest');
+    }
 
     manifestVersions = versions;
-
-    versionSelect.innerHTML = '';
-    for (const v of releases) {
-      const opt = document.createElement('option');
-      opt.value = v.url;
-      opt.dataset.versionId = v.id;
-      opt.textContent = v.id === latest ? `${v.id} (latest)` : v.id;
-      if (v.id === latest) opt.selected = true;
-      versionSelect.appendChild(opt);
-    }
+    populateVersions();
 
     vanillaStatus.textContent = 'No jar? Load a vanilla version directly:';
     vanillaPicker.hidden = false;
@@ -338,9 +357,16 @@ async function fetchVanillaJar(
 
 const vanillaJarName = (id: string) => `minecraft-${id}.jar`;
 
+// The picker's controls move as one: nothing may be re-picked, re-filtered or
+// re-loaded while a client jar is on the wire.
+function setPickerEnabled(enabled: boolean) {
+  versionLoad.disabled = !enabled;
+  versionSelect.disabled = !enabled;
+  versionSnapshots.disabled = !enabled;
+}
+
 async function loadVanilla(versionUrl: string, versionId: string) {
-  versionLoad.disabled = true;
-  versionSelect.disabled = true;
+  setPickerEnabled(false);
   vanillaStatus.classList.remove('error');
   try {
     const version = { id: versionId, url: versionUrl };
@@ -351,8 +377,7 @@ async function loadVanilla(versionUrl: string, versionId: string) {
     await openJars([jar], [vanillaJarName(versionId)]);
   } catch (err) {
     showVanillaError(err);
-    versionLoad.disabled = false;
-    versionSelect.disabled = false;
+    setPickerEnabled(true);
   }
 }
 
@@ -410,8 +435,7 @@ async function autoVanillaJar(
   vanillaPanel.hidden = false;
   vanillaPicker.hidden = false;
   vanillaStatus.classList.remove('error');
-  versionLoad.disabled = true;
-  versionSelect.disabled = true;
+  setPickerEnabled(false);
   try {
     const jar = await fetchVanillaJar(
       version,
@@ -424,8 +448,7 @@ async function autoVanillaJar(
       warning: `Minecraft ${version.id} couldn't be loaded automatically (${err?.message ?? err}), vanilla assets may be missing.`,
     };
   } finally {
-    versionLoad.disabled = false;
-    versionSelect.disabled = false;
+    setPickerEnabled(true);
   }
 }
 
@@ -441,6 +464,8 @@ versionLoad.addEventListener('click', () => {
   const opt = versionSelect.selectedOptions[0];
   if (opt) loadVanilla(opt.value, opt.dataset.versionId || 'unknown');
 });
+
+versionSnapshots.addEventListener('change', populateVersions);
 
 // Kept as a promise so a jar dropped before the manifest lands can still wait
 // for it (and auto-load its vanilla dependency) instead of silently giving up.
