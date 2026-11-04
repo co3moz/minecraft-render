@@ -20,10 +20,18 @@ export class DownloadTest extends Test({ timeout: 120000 }) {
       `https://launchermeta.mojang.com/mc/game/version_manifest.json`,
     );
     const manifest = (await response.json()) as VersionManifest;
-    const targetVersion = manifest.versions.find(
-      (version) =>
-        version.type == 'release' || version.id == manifest.latest.release,
-    )!;
+    // MINECRAFT_VERSION pins an exact version id (e.g. `1.20.6`); otherwise
+    // the latest release is used.
+    const pinned = process.env.MINECRAFT_VERSION;
+    const targetVersion = pinned
+      ? manifest.versions.find((version) => version.id == pinned)
+      : manifest.versions.find(
+          (version) =>
+            version.type == 'release' || version.id == manifest.latest.release,
+        );
+    if (!targetVersion) {
+      throw new Error(`Minecraft version "${pinned}" is not in the manifest`);
+    }
     this.targetVersionUrl = targetVersion.url;
     this.versionId = targetVersion.id;
   }
@@ -66,9 +74,15 @@ function checkExistingJar(instance: DownloadTest): void | never {
 function findExistingJar(): { path: string; versionId: string } | null {
   const dir = path.resolve(__dirname, '../../test-data');
   if (!fs.existsSync(dir)) return null;
+  // With a pinned version, only a jar of exactly that version may be reused.
+  const pinned = process.env.MINECRAFT_VERSION;
   const match = fs
     .readdirSync(dir)
-    .find((file) => /^minecraft-.+\.jar$/.test(file));
+    .find((file) =>
+      pinned
+        ? file === `minecraft-${pinned}.jar`
+        : /^minecraft-.+\.jar$/.test(file),
+    );
   if (!match) return null;
   return {
     path: path.join(dir, match),

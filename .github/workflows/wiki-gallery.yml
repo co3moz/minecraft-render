@@ -2,10 +2,22 @@ name: Wiki Gallery
 
 # Weekly: if a Minecraft release exists that the wiki does not yet have a
 # gallery for, render it and publish a per-version page to the wiki.
+#
+# Manual runs can also backfill older versions (see the `versions` input), e.g.
+#   gh workflow run wiki-gallery.yml -f versions=majors
 on:
   schedule:
     - cron: '0 6 * * 1' # Mondays 06:00 UTC
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: >-
+          Empty = latest release. "majors" = newest release of every version
+          line (1.8+). Or a comma-separated list of exact ids (1.20.6,1.12.2).
+          Versions already in the wiki are skipped.
+        type: string
+        required: false
+        default: ''
 
 # Pushing to the wiki repo uses the default token's contents scope.
 permissions:
@@ -17,46 +29,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Cheap gate: figure out the latest release and whether the wiki already has
-  # it, so the expensive render only runs when there is genuinely new work.
+  # Cheap gate: work out which versions the wiki is missing, so the expensive
+  # render only runs when there is genuinely new work.
   check:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.detect.outputs.version }}
-      is_new: ${{ steps.detect.outputs.is_new }}
+      matrix: ${{ steps.detect.outputs.matrix }}
+      versions: ${{ steps.detect.outputs.versions }}
+      has_work: ${{ steps.detect.outputs.has_work }}
     steps:
-      - name: Detect latest release vs. wiki
-        id: detect
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Clone wiki
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          version=$(curl -sf https://launchermeta.mojang.com/mc/game/version_manifest.json | jq -r '.latest.release')
-          echo "Latest release: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Wiki may not be initialized yet; no checkout means nothing published.
+          git clone --depth 1 \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki \
+            || echo "No wiki checkout (uninitialized?), treating every version as new."
+      - name: Detect versions missing from the wiki
+        id: detect
+        env:
+          VERSIONS: ${{ inputs.versions }}
+          WIKI_DIR: wiki
+        run: node scripts/wiki-versions.mjs
 
-          # Wiki may not be initialized yet; a failed clone means "publish it".
-          if git clone --depth 1 \
-              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki 2>/dev/null; then
-            if [ -f "wiki/Blocks-${version}.md" ]; then
-              echo "Wiki already has $version."
-              echo "is_new=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "Wiki is missing $version."
-              echo "is_new=true" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "No wiki checkout (uninitialized?) — treating as new."
-            echo "is_new=true" >> "$GITHUB_OUTPUT"
-          fi
-
+  # One job per version. Each uploads its PNGs; nothing touches the wiki here so
+  # parallel jobs can't race on a push.
   render:
     needs: check
-    if: needs.check.outputs.is_new == 'true'
+    if: needs.check.outputs.has_work == 'true'
+    name: Render ${{ matrix.version }}
     # Same 22.04 pin as the test workflow: gl's bundled ANGLE fails to build on
     # newer GCC.
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    strategy:
+      # One broken old version must not stop the others from publishing.
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include: ${{ fromJson(needs.check.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -80,33 +96,79 @@ jobs:
       - name: Install dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
-      # Renders the latest release into test-data/*.png at 256x256.
+      # Renders the requested version into test-data/*.png at 256x256.
       - name: Render blocks
         run: xvfb-run --auto-servernum npm test
         env:
           WIDTH: '256'
           HEIGHT: '256'
+          MINECRAFT_VERSION: ${{ matrix.version }}
+          # 1.8 models have no gui transform; use the vanilla default instead.
+          RENDER_WITHOUT_GUI: ${{ matrix.without_gui }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gallery-${{ matrix.version }}
+          path: test-data/*.png
+          if-no-files-found: error
+          retention-days: 3
+
+  # Writes every rendered version into the wiki with a single commit and push.
+  publish:
+    needs: [check, render]
+    # Publish whatever rendered, even if some versions failed.
+    if: ${{ !cancelled() && needs.check.outputs.has_work == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gallery-*
+          path: galleries
       - name: Clone wiki
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git clone \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" wiki
-      - name: Generate wiki page
+      - name: Generate wiki pages
+        id: generate
         env:
           REPO: ${{ github.repository }}
           WIKI_DIR: wiki
-          TEST_DATA_DIR: test-data
-        run: node scripts/generate-wiki.mjs
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          published=()
+          for dir in galleries/gallery-*/; do
+            version="${dir#galleries/gallery-}"
+            version="${version%/}"
+            VERSION="$version" SRC_DIR="$dir" node scripts/generate-wiki.mjs
+            published+=("$version")
+          done
+          if [ "${#published[@]}" -eq 0 ]; then
+            echo "No version rendered successfully; nothing to publish."
+            exit 1
+          fi
+          echo "published=${published[*]}" >> "$GITHUB_OUTPUT"
+          echo "count=${#published[@]}" >> "$GITHUB_OUTPUT"
       - name: Commit and push to wiki
         working-directory: wiki
+        env:
+          PUBLISHED: ${{ steps.generate.outputs.published }}
+          COUNT: ${{ steps.generate.outputs.count }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
             echo "Nothing to commit."
+          elif [ "$COUNT" = "1" ]; then
+            git commit -m "Add gallery for Minecraft ${PUBLISHED}"
+            git push
           else
-            git commit -m "Add gallery for Minecraft ${{ needs.check.outputs.version }}"
+            git commit -m "Add galleries for Minecraft ${PUBLISHED// /, }"
             git push
           fi
