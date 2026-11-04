@@ -1,10 +1,13 @@
 name: Wiki Gallery
 
 # Weekly: if a Minecraft release exists that the wiki does not yet have a
-# gallery for, render it and publish a per-version page to the wiki.
+# gallery for, render it and publish a per-version page to the wiki, plus a
+# "Changes" page per version step (what changed from the previous gallery).
 #
 # Manual runs can also backfill older versions (see the `versions` input), e.g.
 #   gh workflow run wiki-gallery.yml -f versions=majors
+# or re-render ones the wiki already has:
+#   gh workflow run wiki-gallery.yml -f versions=26.3 -f force=true
 on:
   schedule:
     - cron: '0 6 * * 1' # Mondays 06:00 UTC
@@ -14,10 +17,15 @@ on:
         description: >-
           Empty = latest release. "majors" = newest release of every version
           line (1.8+). Or a comma-separated list of exact ids (1.20.6,1.12.2).
-          Versions already in the wiki are skipped.
+          Versions already in the wiki are skipped unless "force" is set.
         type: string
         required: false
         default: ''
+      force:
+        description: Re-render versions the wiki already has.
+        type: boolean
+        required: false
+        default: false
 
 # Pushing to the wiki repo uses the default token's contents scope.
 permissions:
@@ -54,6 +62,7 @@ jobs:
         id: detect
         env:
           VERSIONS: ${{ inputs.versions }}
+          FORCE: ${{ inputs.force }}
           WIKI_DIR: wiki
         run: node scripts/wiki-versions.mjs
 
@@ -105,6 +114,13 @@ jobs:
           MINECRAFT_VERSION: ${{ matrix.version }}
           # 1.8 models have no gui transform; use the vanilla default instead.
           RENDER_WITHOUT_GUI: ${{ matrix.without_gui }}
+      # Without a gui transform every 1.8 model gets rendered; keep only the
+      # blocks the inventory shows (those its item models point at).
+      - name: Keep inventory blocks only (1.8)
+        if: matrix.without_gui
+        run: |
+          node scripts/legacy-inventory-filter.mjs \
+            "test-data/minecraft-${{ matrix.version }}.jar" test-data
       - uses: actions/upload-artifact@v4
         with:
           name: gallery-${{ matrix.version }}
@@ -154,6 +170,8 @@ jobs:
           fi
           echo "published=${published[*]}" >> "$GITHUB_OUTPUT"
           echo "count=${#published[@]}" >> "$GITHUB_OUTPUT"
+          # Rebuild every version-to-version change page from the galleries.
+          node scripts/wiki-changes.mjs
       - name: Commit and push to wiki
         working-directory: wiki
         env:

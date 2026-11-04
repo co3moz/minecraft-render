@@ -10,6 +10,7 @@
 //   WIKI_DIR   checked-out wiki repo; versions that already have a
 //              Blocks-<version>.md page there are dropped (default ./wiki;
 //              a missing folder means the wiki is empty)
+//   FORCE      'true' keeps versions the wiki already has, to re-render them
 //
 // Outputs (to $GITHUB_OUTPUT, or stdout when run locally):
 //   matrix     JSON array of { version, without_gui } for `strategy.matrix.include`
@@ -55,7 +56,8 @@ if (request === 'latest') {
   }
 }
 
-const published = existingGalleries(WIKI_DIR);
+const published =
+  process.env.FORCE === 'true' ? new Set() : existingGalleries(WIKI_DIR);
 const skipped = candidates.filter((id) => published.has(id));
 const todo = candidates.filter((id) => !published.has(id));
 

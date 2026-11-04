@@ -36,6 +36,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { regenerateIndex } from './wiki-index.mjs';
 
 const SRC_DIR =
   process.env.SRC_DIR || process.env.TEST_DATA_DIR || './test-data';
@@ -61,9 +62,16 @@ if (pngs.length === 0) {
   process.exit(1);
 }
 
-// Copy the images into the wiki under a per-gallery folder.
+// Copy the images into the wiki under a per-gallery folder. A re-publish
+// replaces the gallery, so drop images that are no longer rendered.
 const imagesDir = path.join(WIKI_DIR, 'images', target.imageSlug);
 fs.mkdirSync(imagesDir, { recursive: true });
+const keep = new Set(pngs);
+for (const old of fs.readdirSync(imagesDir)) {
+  if (old.endsWith('.png') && !keep.has(old)) {
+    fs.unlinkSync(path.join(imagesDir, old));
+  }
+}
 for (const png of pngs) {
   fs.copyFileSync(path.join(SRC_DIR, png), path.join(imagesDir, png));
 }
@@ -134,54 +142,4 @@ function deriveVersion(dir) {
   if (!fs.existsSync(dir)) return '';
   const jar = fs.readdirSync(dir).find((f) => /^minecraft-.+\.jar$/.test(f));
   return jar ? jar.replace(/^minecraft-/, '').replace(/\.jar$/, '') : '';
-}
-
-// Rebuild Home.md and _Sidebar.md from every gallery page present so the index
-// always reflects the full set, grouped by kind and newest-first per group.
-function regenerateIndex(wikiDir) {
-  const files = fs.readdirSync(wikiDir);
-
-  const versions = files
-    .filter((f) => /^Blocks-.+\.md$/.test(f))
-    .map((f) => f.replace(/^Blocks-/, '').replace(/\.md$/, ''))
-    .sort(compareVersionsDesc)
-    .map((v) => `- [Minecraft ${v}](Blocks-${v})`);
-
-  const mods = files
-    .filter((f) => /^Mod-.+\.md$/.test(f))
-    .map((f) => f.replace(/^Mod-/, '').replace(/\.md$/, ''))
-    .sort((a, b) => a.localeCompare(b))
-    .map((m) => `- [${m}](Mod-${m})`);
-
-  const sections = [];
-  if (versions.length) sections.push(`## Versions\n\n${versions.join('\n')}`);
-  if (mods.length) sections.push(`## Mods\n\n${mods.join('\n')}`);
-  const body = sections.join('\n\n');
-
-  const home = `# minecraft-render gallery
-
-Rendered block & item galleries. Updated automatically.
-
-${body}
-`;
-  fs.writeFileSync(path.join(wikiDir, 'Home.md'), home);
-
-  const sidebar = sections
-    .map((s) => s.replace(/^## /, '### '))
-    .join('\n\n');
-  fs.writeFileSync(path.join(wikiDir, '_Sidebar.md'), `${sidebar}\n`);
-
-  console.log(
-    `Index rebuilt: ${versions.length} version(s), ${mods.length} mod(s).`,
-  );
-}
-
-function compareVersionsDesc(a, b) {
-  const pa = a.split(/[.\-+]/).map((x) => parseInt(x, 10) || 0);
-  const pb = b.split(/[.\-+]/).map((x) => parseInt(x, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pb[i] || 0) - (pa[i] || 0);
-    if (diff !== 0) return diff;
-  }
-  return b.localeCompare(a);
 }

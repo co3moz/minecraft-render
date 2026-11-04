@@ -10,8 +10,9 @@ and rendering can be **parallelized** across worker processes.
 ### Pre-rendered assets
 
 Pre-rendered block & item galleries live in the [wiki](https://github.com/co3moz/minecraft-render/wiki),
-with a separate page per Minecraft release, from 1.8 up to the latest. A weekly
-job renders any new release automatically.
+with a separate page per Minecraft release, from 1.8 up to the latest, plus a
+"Changes" page per version step listing the blocks that were changed, added or
+removed. A weekly job renders any new release automatically.
 
 Browse them here: [minecraft-render wiki](https://github.com/co3moz/minecraft-render/wiki)
 
