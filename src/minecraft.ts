@@ -161,16 +161,17 @@ export class Minecraft {
     const path = resolveAssetPath(name, 'models', '.json');
 
     try {
-      if (this._cache[path]) {
-        return JSON.parse(JSON.stringify(this._cache[path]));
-      }
-
-      this._cache[path] = await this.readJson(path);
-
-      return this._cache[path];
+      this._cache[path] ??= await this.readJson(path);
     } catch (e) {
       throw new Error(await this.missingAssetMessage(name, `model ${path}`));
     }
+
+    // Always hand out a copy, the first read included. resolveModel merges a
+    // child into its parent with deepAssign, which writes into the parent's
+    // nested objects; given the cached object itself, one block's overrides
+    // (a stair's `display.gui`, say) would leak into every block resolved
+    // later that shares the parent.
+    return JSON.parse(JSON.stringify(this._cache[path]));
   }
 
   async getTextureFile(name: string = '') {

@@ -661,10 +661,17 @@ async function constructTextureMaterial(
   const scaleX = width / texW;
   const scaleY = height / texH;
 
+  // When a face omits `uv`, Minecraft derives it from the element's geometry
+  // (the face's slice of the block), not the whole texture. Falling back to the
+  // full texture stretches it onto partial faces (e.g. the composter rim).
+  const uv = face.uv ?? defaultUv(direction, element.from!, element.to!);
+
   const frameKey = blend
     ? `${blend.from}-${blend.to}@${blend.factor.toFixed(3)}`
     : `${frame}`;
-  const materialCacheKey = `material:${path}_${face.rotation || 0}_${face.uv ? face.uv.join(',') : ''}_${frameKey}_${shaded ? 's' : 'u'}_${texW}x${texH}`;
+  // Keyed on the effective uv: two faces without an explicit `uv` share a key
+  // only if they also cut the same slice of the texture.
+  const materialCacheKey = `material:${path}_${face.rotation || 0}_${uv.join(',')}_${frameKey}_${shaded ? 's' : 'u'}_${texW}x${texH}`;
   if (cache[materialCacheKey]) {
     return cache[materialCacheKey];
   }
@@ -681,11 +688,6 @@ async function constructTextureMaterial(
 
     Logger.trace(() => `Face[${direction}] rotation applied`);
   }
-
-  // When a face omits `uv`, Minecraft derives it from the element's geometry
-  // (the face's slice of the block), not the whole texture. Falling back to the
-  // full texture stretches it onto partial faces (e.g. the composter rim).
-  const uv = face.uv ?? defaultUv(direction, element.from!, element.to!);
 
   // Minecraft allows reversed UVs where u1 > u2 (mirror horizontally) or
   // v1 > v2 (mirror vertically). drawImage with a negative source width/height
