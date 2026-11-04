@@ -14,6 +14,8 @@ export class MinecraftTest extends Test({
   }
 
   async blockModel() {
-    await this.minecraft.getModelFile();
+    // `block/cube` exists in every JSON-model version; `block/block` (the
+    // default) only since 1.9.
+    await this.minecraft.getModelFile('block/cube');
   }
 }
